@@ -15,6 +15,10 @@ const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
 app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(express.json());
 
+app.get('/', (_req, res) => {
+  res.json({ name: 'MindBuddy API', status: 'running', docs: '/api/health' });
+});
+
 app.use('/api/auth', authRouter);
 app.use('/api/goals', goalsRouter);
 app.use('/api/check-ins', checkInsRouter);

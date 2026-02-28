@@ -2,11 +2,16 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import type { JwtPayload } from '../types.js';
 
-const JWT_SECRET: string | undefined = process.env.JWT_SECRET;
-if (!JWT_SECRET || JWT_SECRET.length < 32) {
-  throw new Error('JWT_SECRET must be set and at least 32 characters');
+// Support both JWT_SECRET and JWT-SECRET (some platforms use hyphen)
+const raw =
+  process.env.JWT_SECRET ??
+  (process.env as Record<string, string | undefined>)['JWT-SECRET'];
+if (!raw || typeof raw !== 'string' || raw.length < 32) {
+  throw new Error(
+    'JWT_SECRET must be set and at least 32 characters. Add it in your app environment variables (name: JWT_SECRET or JWT-SECRET).'
+  );
 }
-const secret: string = JWT_SECRET;
+const secret: string = raw;
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
   const auth = req.headers.authorization;
