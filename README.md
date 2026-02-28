@@ -1,8 +1,33 @@
-# Mental Health Accountability App
+# Goal-Tracking-App
 
-This is a code bundle for Mental Health Accountability App. The original project is available at https://www.figma.com/design/OmoKuWijoSjf4mXtmOrVWE/Mental-Health-Accountability-App.
+## Project Overview
 
-## Running the code
+### Goal
+Build a mobile application that helps users set and achieve goals by adding accountability via automated reporting to a designated mentor, therapist, or accountability partner.
+
+### Target Audience
+People who want to establish and maintain habits, track personal goals (mental health, fitness, productivity), and benefit from external accountability.
+
+### Core Value Proposition
+A seamless goal-tracking experience paired with a transparent, automated accountability loop to an external professional or partner. Includes an integrated reflective diary and an AI chat agent for internal guidance and support.
+
+### Proposed Name
+Goal-Tracking-App
+
+## Features In Progress
+
+### Member App
+- Daily goal check-in (met/not met)
+- Reflective diary for goal-specific notes
+- AI chatbot with access to diary context to help the member stay on track
+
+### Mentor App
+- Analytics dashboard for all members
+- AI chatbot to discuss plans and interventions based on collected data
+
+## Running the Frontend (MindBuddy UI)
+
+This is the code bundle for the Mental Health Accountability App. The original project is available at https://www.figma.com/design/OmoKuWijoSjf4mXtmOrVWE/Mental-Health-Accountability-App.
 
 ### Frontend only (demo mode)
 
@@ -39,4 +64,35 @@ If you see **"Request timed out"** or **ETIMEDOUT** when using a DigitalOcean ma
    - **Allow all** (for testing only): add `0.0.0.0/0`.
 4. Save. Wait a minute, then try signing up again.
 
-Your app runs on your machine, so the IP that must be allowed is the one your machine uses to reach the internet (your home/office or VPN). If you deploy the backend to a server later, add that server’s IP to Trusted Sources as well.
+Your app runs on your machine, so the IP that must be allowed is the one your machine uses to reach the internet (your home/office or VPN). If you deploy the backend to a server later, add that server's IP to Trusted Sources as well.
+
+## File structure
+
+Top-level overview of the repository (key files and folders):
+
+```
+Goal-Tracking-App/
+├── backend/                  # Python/FastAPI backend (mentor/member APIs, AI chat)
+│   ├── app/
+│   │   ├── main.py           # FastAPI entrypoints
+│   │   ├── gemini.py         # LLM / AI integration helpers
+│   │   ├── database.py       # DB connection and setup
+│   │   └── models.py         # Pydantic / ORM models
+│   ├── worker/
+│   │   ├── celery_app.py     # Celery configuration
+│   │   └── tasks.py          # Background tasks
+│   └── requirements.txt      # Python dependencies
+├── server/                   # Node.js/Express API (auth, goals, check-ins, groups)
+├── src/                      # React/Vite frontend
+├── guidelines/               # Design guidelines
+├── index.html
+├── package.json
+├── vite.config.ts
+└── README.md
+```
+
+Notes:
+- `backend/` contains the Python/FastAPI services (mentor app, AI chat, analytics).
+- `server/` contains the Node.js/Express API (auth, goals, check-ins, groups).
+- `src/` contains the React frontend.
+- Update this section as new top-level folders (e.g. `mobile/`, `infra/`) are introduced.
