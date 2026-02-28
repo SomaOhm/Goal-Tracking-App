@@ -1,8 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { format } from 'date-fns';
-import { api, getToken, setToken, clearToken, isApiEnabled } from '../api/client';
+import { supabase, isSupabaseEnabled } from '../lib/supabase';
 
-// Types
 export interface User {
   id: string;
   email: string;
@@ -69,12 +68,72 @@ export const useApp = () => {
   return context;
 };
 
-async function fetchUsersForGroups(groups: Group[]): Promise<User[]> {
-  const ids = [...new Set(groups.flatMap((g) => g.members))];
-  if (ids.length === 0) return [];
-  const res = await api.get<User[]>(`/api/users?ids=${ids.join(',')}`);
-  return Array.isArray(res) ? res : [];
+// ── Supabase row → frontend model helpers ──
+
+interface GoalRow {
+  id: string;
+  user_id: string;
+  title: string;
+  description: string;
+  frequency: 'daily' | 'weekly' | 'custom';
+  custom_days: number[] | null;
+  checklist: string[] | null;
+  created_at: string;
+  goal_completions: { date: string; reflection: string | null }[];
+  goal_visibility: { group_id: string }[];
 }
+
+function rowToGoal(r: GoalRow): Goal {
+  return {
+    id: r.id,
+    userId: r.user_id,
+    title: r.title,
+    description: r.description ?? '',
+    frequency: r.frequency,
+    customDays: r.custom_days ?? undefined,
+    checklist: r.checklist ?? undefined,
+    completions: (r.goal_completions ?? []).map((c) => ({
+      date: c.date,
+      reflection: c.reflection ?? undefined,
+    })),
+    visibleToGroups: (r.goal_visibility ?? []).map((v) => v.group_id),
+    createdAt: r.created_at,
+  };
+}
+
+interface CheckInRow {
+  id: string;
+  user_id: string;
+  date: string;
+  mood: number;
+  reflection: string;
+  check_in_visibility: { group_id: string }[];
+}
+
+function rowToCheckIn(r: CheckInRow): CheckIn {
+  return {
+    id: r.id,
+    userId: r.user_id,
+    date: r.date,
+    mood: r.mood,
+    reflection: r.reflection ?? '',
+    visibleToGroups: (r.check_in_visibility ?? []).map((v) => v.group_id),
+  };
+}
+
+interface GroupMemberRow {
+  group_id: string;
+  user_id: string;
+  groups: {
+    id: string;
+    name: string;
+    invite_code: string;
+    created_by: string;
+    created_at: string;
+  };
+}
+
+// ── Provider ──
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -82,173 +141,195 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [goals, setGoals] = useState<Goal[]>([]);
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
-  const [apiReady, setApiReady] = useState(!isApiEnabled());
+  const [apiReady, setApiReady] = useState(!isSupabaseEnabled());
+
+  // ── Supabase data fetchers ──
 
   const fetchGoals = useCallback(async () => {
-    const list = await api.get<Goal[]>('/api/goals');
-    setGoals(Array.isArray(list) ? list : []);
+    if (!supabase) return;
+    const { data, error } = await supabase
+      .from('goals')
+      .select('*, goal_completions(date, reflection), goal_visibility(group_id)')
+      .order('created_at', { ascending: false });
+    if (error) { console.error('fetchGoals', error); return; }
+    setGoals((data as GoalRow[]).map(rowToGoal));
   }, []);
 
   const fetchCheckIns = useCallback(async () => {
-    const list = await api.get<CheckIn[]>('/api/check-ins');
-    setCheckIns(Array.isArray(list) ? list : []);
+    if (!supabase) return;
+    const { data, error } = await supabase
+      .from('check_ins')
+      .select('*, check_in_visibility(group_id)')
+      .order('date', { ascending: false });
+    if (error) { console.error('fetchCheckIns', error); return; }
+    setCheckIns((data as CheckInRow[]).map(rowToCheckIn));
   }, []);
 
   const fetchGroups = useCallback(async () => {
-    const list = await api.get<Group[]>('/api/groups');
-    const next = Array.isArray(list) ? list : [];
-    setGroups(next);
-    const memberUsers = await fetchUsersForGroups(next);
-    setUsers(memberUsers);
+    if (!supabase) return;
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (!authUser) return;
+
+    const { data, error } = await supabase
+      .from('group_members')
+      .select('group_id, user_id, groups(id, name, invite_code, created_by, created_at)')
+      .order('joined_at', { ascending: false });
+    if (error) { console.error('fetchGroups', error); return; }
+
+    const rows = data as GroupMemberRow[];
+    const groupMap = new Map<string, Group>();
+    for (const row of rows) {
+      const g = row.groups;
+      if (!g) continue;
+      if (!groupMap.has(g.id)) {
+        groupMap.set(g.id, {
+          id: g.id,
+          name: g.name,
+          inviteCode: g.invite_code,
+          members: [],
+          createdBy: g.created_by,
+          createdAt: g.created_at,
+        });
+      }
+      groupMap.get(g.id)!.members.push(row.user_id);
+    }
+    const groupList = [...groupMap.values()];
+    setGroups(groupList);
+
+    const memberIds = [...new Set(groupList.flatMap((g) => g.members))];
+    if (memberIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, email, name, avatar')
+        .in('id', memberIds);
+      if (profiles) setUsers(profiles as User[]);
+    }
   }, []);
 
-  // Initial load: API session restore or localStorage + demo
+  // ── Session init ──
+
   useEffect(() => {
-    if (isApiEnabled()) {
-      const token = getToken();
-      if (!token) {
-        setApiReady(true);
-        return;
+    if (!supabase) {
+      // localStorage demo mode
+      const hasInitialized = localStorage.getItem('hasInitialized');
+      if (!hasInitialized) {
+        const demoUsers: User[] = [
+          { id: 'demo_user_1', email: 'alex@example.com', name: 'Alex' },
+          { id: 'demo_user_2', email: 'sam@example.com', name: 'Sam' },
+          { id: 'demo_user_3', email: 'jordan@example.com', name: 'Jordan' },
+        ];
+        const demoGroup: Group = {
+          id: 'demo_group_1',
+          name: 'Wellness Warriors',
+          inviteCode: 'DEMO99',
+          members: ['demo_user_1', 'demo_user_2', 'demo_user_3'],
+          createdBy: 'demo_user_1',
+          createdAt: new Date().toISOString(),
+        };
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const twoDaysAgo = new Date(today);
+        twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+        const demoGoals: Goal[] = [
+          {
+            id: 'demo_goal_1', userId: 'demo_user_1', title: 'Morning Meditation',
+            description: '10 minutes of mindfulness', frequency: 'daily',
+            completions: [
+              { date: format(today, 'yyyy-MM-dd') },
+              { date: format(yesterday, 'yyyy-MM-dd') },
+              { date: format(twoDaysAgo, 'yyyy-MM-dd') },
+            ],
+            visibleToGroups: ['demo_group_1'], createdAt: twoDaysAgo.toISOString(),
+          },
+          {
+            id: 'demo_goal_2', userId: 'demo_user_2', title: 'Gratitude Journal',
+            description: "Write 3 things I'm grateful for", frequency: 'daily',
+            completions: [
+              { date: format(today, 'yyyy-MM-dd'), reflection: 'Feeling thankful for my friends today' },
+              { date: format(yesterday, 'yyyy-MM-dd') },
+            ],
+            visibleToGroups: ['demo_group_1'], createdAt: yesterday.toISOString(),
+          },
+        ];
+        const demoCheckIns: CheckIn[] = [
+          { id: 'demo_checkin_1', userId: 'demo_user_1', date: format(today, 'yyyy-MM-dd'), mood: 4, reflection: 'Had a productive morning! Feeling good.', visibleToGroups: ['demo_group_1'] },
+          { id: 'demo_checkin_2', userId: 'demo_user_2', date: format(today, 'yyyy-MM-dd'), mood: 5, reflection: 'Great day with lots of positive energy', visibleToGroups: ['demo_group_1'] },
+        ];
+        localStorage.setItem('users', JSON.stringify(demoUsers));
+        localStorage.setItem('groups', JSON.stringify([demoGroup]));
+        localStorage.setItem('goals', JSON.stringify(demoGoals));
+        localStorage.setItem('checkIns', JSON.stringify(demoCheckIns));
+        localStorage.setItem('hasInitialized', 'true');
+        setUsers(demoUsers);
+        setGroups([demoGroup]);
+        setGoals(demoGoals);
+        setCheckIns(demoCheckIns);
       }
-      api
-        .get<User>('/api/auth/me')
-        .then((me) => {
-          setUser(me);
-          setApiReady(true);
-          Promise.all([fetchGoals(), fetchCheckIns(), fetchGroups()]).catch(() => {});
-        })
-        .catch(() => {
-          clearToken();
-          setApiReady(true);
-        });
+      const storedUser = localStorage.getItem('currentUser');
+      const storedUsers = localStorage.getItem('users');
+      const storedGoals = localStorage.getItem('goals');
+      const storedCheckIns = localStorage.getItem('checkIns');
+      const storedGroups = localStorage.getItem('groups');
+      if (storedUser) setUser(JSON.parse(storedUser));
+      if (storedUsers) setUsers(JSON.parse(storedUsers));
+      if (storedGoals) setGoals(JSON.parse(storedGoals));
+      if (storedCheckIns) setCheckIns(JSON.parse(storedCheckIns));
+      if (storedGroups) setGroups(JSON.parse(storedGroups));
+      setApiReady(true);
       return;
     }
 
-    // LocalStorage mode: demo init once
-    const hasInitialized = localStorage.getItem('hasInitialized');
-    if (!hasInitialized) {
-      const demoUsers: User[] = [
-        { id: 'demo_user_1', email: 'alex@example.com', name: 'Alex' },
-        { id: 'demo_user_2', email: 'sam@example.com', name: 'Sam' },
-        { id: 'demo_user_3', email: 'jordan@example.com', name: 'Jordan' },
-      ];
-      const demoGroup: Group = {
-        id: 'demo_group_1',
-        name: 'Wellness Warriors',
-        inviteCode: 'DEMO99',
-        members: ['demo_user_1', 'demo_user_2', 'demo_user_3'],
-        createdBy: 'demo_user_1',
-        createdAt: new Date().toISOString(),
-      };
-      const today = new Date();
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-      const twoDaysAgo = new Date(today);
-      twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-      const demoGoals: Goal[] = [
-        {
-          id: 'demo_goal_1',
-          userId: 'demo_user_1',
-          title: 'Morning Meditation',
-          description: '10 minutes of mindfulness',
-          frequency: 'daily',
-          completions: [
-            { date: format(today, 'yyyy-MM-dd') },
-            { date: format(yesterday, 'yyyy-MM-dd') },
-            { date: format(twoDaysAgo, 'yyyy-MM-dd') },
-          ],
-          visibleToGroups: ['demo_group_1'],
-          createdAt: twoDaysAgo.toISOString(),
-        },
-        {
-          id: 'demo_goal_2',
-          userId: 'demo_user_2',
-          title: 'Gratitude Journal',
-          description: "Write 3 things I'm grateful for",
-          frequency: 'daily',
-          completions: [
-            { date: format(today, 'yyyy-MM-dd'), reflection: 'Feeling thankful for my friends today' },
-            { date: format(yesterday, 'yyyy-MM-dd') },
-          ],
-          visibleToGroups: ['demo_group_1'],
-          createdAt: yesterday.toISOString(),
-        },
-      ];
-      const demoCheckIns: CheckIn[] = [
-        {
-          id: 'demo_checkin_1',
-          userId: 'demo_user_1',
-          date: format(today, 'yyyy-MM-dd'),
-          mood: 4,
-          reflection: 'Had a productive morning! Feeling good.',
-          visibleToGroups: ['demo_group_1'],
-        },
-        {
-          id: 'demo_checkin_2',
-          userId: 'demo_user_2',
-          date: format(today, 'yyyy-MM-dd'),
-          mood: 5,
-          reflection: 'Great day with lots of positive energy',
-          visibleToGroups: ['demo_group_1'],
-        },
-      ];
-      localStorage.setItem('users', JSON.stringify(demoUsers));
-      localStorage.setItem('groups', JSON.stringify([demoGroup]));
-      localStorage.setItem('goals', JSON.stringify(demoGoals));
-      localStorage.setItem('checkIns', JSON.stringify(demoCheckIns));
-      localStorage.setItem('hasInitialized', 'true');
-      setUsers(demoUsers);
-      setGroups([demoGroup]);
-      setGoals(demoGoals);
-      setCheckIns(demoCheckIns);
-    }
+    // Supabase session restore
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id, email, name, avatar')
+          .eq('id', session.user.id)
+          .single();
+        if (profile) setUser(profile as User);
+        await Promise.all([fetchGoals(), fetchCheckIns(), fetchGroups()]).catch(() => {});
+      }
+      setApiReady(true);
+    });
 
-    const storedUser = localStorage.getItem('currentUser');
-    const storedUsers = localStorage.getItem('users');
-    const storedGoals = localStorage.getItem('goals');
-    const storedCheckIns = localStorage.getItem('checkIns');
-    const storedGroups = localStorage.getItem('groups');
-    if (storedUser) setUser(JSON.parse(storedUser));
-    if (storedUsers) setUsers(JSON.parse(storedUsers));
-    if (storedGoals) setGoals(JSON.parse(storedGoals));
-    if (storedCheckIns) setCheckIns(JSON.parse(storedCheckIns));
-    if (storedGroups) setGroups(JSON.parse(storedGroups));
-    setApiReady(true);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT' || !session?.user) {
+        setUser(null);
+        setGoals([]);
+        setCheckIns([]);
+        setGroups([]);
+        setUsers([]);
+        return;
+      }
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id, email, name, avatar')
+          .eq('id', session.user.id)
+          .single();
+        if (profile) setUser(profile as User);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, [fetchGoals, fetchCheckIns, fetchGroups]);
 
-  // LocalStorage persistence when not using API
-  useEffect(() => {
-    if (isApiEnabled()) return;
-    if (user) localStorage.setItem('currentUser', JSON.stringify(user));
-    else localStorage.removeItem('currentUser');
-  }, [user]);
+  // localStorage persistence (demo mode only)
+  useEffect(() => { if (!isSupabaseEnabled() && user) localStorage.setItem('currentUser', JSON.stringify(user)); else if (!isSupabaseEnabled()) localStorage.removeItem('currentUser'); }, [user]);
+  useEffect(() => { if (!isSupabaseEnabled()) localStorage.setItem('users', JSON.stringify(users)); }, [users]);
+  useEffect(() => { if (!isSupabaseEnabled()) localStorage.setItem('goals', JSON.stringify(goals)); }, [goals]);
+  useEffect(() => { if (!isSupabaseEnabled()) localStorage.setItem('checkIns', JSON.stringify(checkIns)); }, [checkIns]);
+  useEffect(() => { if (!isSupabaseEnabled()) localStorage.setItem('groups', JSON.stringify(groups)); }, [groups]);
 
-  useEffect(() => {
-    if (isApiEnabled()) return;
-    localStorage.setItem('users', JSON.stringify(users));
-  }, [users]);
-
-  useEffect(() => {
-    if (isApiEnabled()) return;
-    localStorage.setItem('goals', JSON.stringify(goals));
-  }, [goals]);
-
-  useEffect(() => {
-    if (isApiEnabled()) return;
-    localStorage.setItem('checkIns', JSON.stringify(checkIns));
-  }, [checkIns]);
-
-  useEffect(() => {
-    if (isApiEnabled()) return;
-    localStorage.setItem('groups', JSON.stringify(groups));
-  }, [groups]);
+  // ── Auth ──
 
   const login = async (email: string, password: string) => {
-    if (isApiEnabled()) {
-      const { user: u, token } = await api.post<{ user: User; token: string }>('/api/auth/login', { email, password });
-      setToken(token);
-      setUser(u);
-      Promise.all([fetchGoals(), fetchCheckIns(), fetchGroups()]).catch(() => {});
+    if (supabase) {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw new Error(error.message);
+      await Promise.all([fetchGoals(), fetchCheckIns(), fetchGroups()]).catch(() => {});
       return;
     }
     const foundUser = users.find((u) => u.email === email);
@@ -257,15 +338,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const signup = async (email: string, password: string, name: string) => {
-    if (isApiEnabled()) {
-      const { user: u, token } = await api.post<{ user: User; token: string }>('/api/auth/signup', {
+    if (supabase) {
+      const { error } = await supabase.auth.signUp({
         email,
         password,
-        name,
+        options: { data: { name } },
       });
-      setToken(token);
-      setUser(u);
-      Promise.all([fetchGoals(), fetchCheckIns(), fetchGroups()]).catch(() => {});
+      if (error) throw new Error(error.message);
+      await Promise.all([fetchGoals(), fetchCheckIns(), fetchGroups()]).catch(() => {});
       return;
     }
     const existingUser = users.find((u) => u.email === email);
@@ -276,27 +356,42 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const logout = () => {
-    if (isApiEnabled()) {
-      clearToken();
-      setUser(null);
-      setGoals([]);
-      setCheckIns([]);
-      setGroups([]);
-      setUsers([]);
+    if (supabase) {
+      supabase.auth.signOut();
       return;
     }
     setUser(null);
   };
 
+  // ── Goals ──
+
   const addGoal = (goal: Omit<Goal, 'id' | 'userId' | 'completions' | 'createdAt'>) => {
     if (!user) return;
-    if (isApiEnabled()) {
-      api
-        .post<Goal>('/api/goals', goal)
-        .then((newGoal) => setGoals((prev) => [newGoal, ...prev]))
-        .catch((err) => {
-          throw err;
-        });
+    if (supabase) {
+      (async () => {
+        const { data, error } = await supabase
+          .from('goals')
+          .insert({
+            user_id: user.id,
+            title: goal.title,
+            description: goal.description,
+            frequency: goal.frequency,
+            custom_days: goal.customDays ?? null,
+            checklist: goal.checklist ?? null,
+          })
+          .select('*, goal_completions(date, reflection), goal_visibility(group_id)')
+          .single();
+        if (error) { console.error('addGoal', error); return; }
+        const newGoal = rowToGoal(data as GoalRow);
+
+        if (goal.visibleToGroups?.length) {
+          await supabase.from('goal_visibility').insert(
+            goal.visibleToGroups.map((gid) => ({ goal_id: newGoal.id, group_id: gid }))
+          );
+          newGoal.visibleToGroups = goal.visibleToGroups;
+        }
+        setGoals((prev) => [newGoal, ...prev]);
+      })();
       return;
     }
     const newGoal: Goal = {
@@ -310,25 +405,42 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateGoal = (id: string, updates: Partial<Goal>) => {
-    if (isApiEnabled()) {
-      api
-        .patch<Goal>(`/api/goals/${id}`, updates)
-        .then((updated) => setGoals((prev) => prev.map((g) => (g.id === id ? updated : g))))
-        .catch((err) => {
-          throw err;
-        });
+    if (supabase) {
+      (async () => {
+        const dbUpdates: Record<string, unknown> = {};
+        if (updates.title !== undefined) dbUpdates.title = updates.title;
+        if (updates.description !== undefined) dbUpdates.description = updates.description;
+        if (updates.frequency !== undefined) dbUpdates.frequency = updates.frequency;
+        if (updates.customDays !== undefined) dbUpdates.custom_days = updates.customDays;
+        if (updates.checklist !== undefined) dbUpdates.checklist = updates.checklist;
+
+        if (Object.keys(dbUpdates).length > 0) {
+          const { error } = await supabase.from('goals').update(dbUpdates).eq('id', id);
+          if (error) { console.error('updateGoal', error); return; }
+        }
+
+        if (updates.visibleToGroups !== undefined) {
+          await supabase.from('goal_visibility').delete().eq('goal_id', id);
+          if (updates.visibleToGroups.length > 0) {
+            await supabase.from('goal_visibility').insert(
+              updates.visibleToGroups.map((gid) => ({ goal_id: id, group_id: gid }))
+            );
+          }
+        }
+
+        setGoals((prev) => prev.map((g) => (g.id === id ? { ...g, ...updates } : g)));
+      })();
       return;
     }
     setGoals((prev) => prev.map((g) => (g.id === id ? { ...g, ...updates } : g)));
   };
 
   const deleteGoal = (id: string) => {
-    if (isApiEnabled()) {
-      api
-        .delete(`/api/goals/${id}`)
-        .then(() => setGoals((prev) => prev.filter((g) => g.id !== id)))
-        .catch((err) => {
-          throw err;
+    if (supabase) {
+      supabase.from('goals').delete().eq('id', id)
+        .then(({ error }) => {
+          if (error) { console.error('deleteGoal', error); return; }
+          setGoals((prev) => prev.filter((g) => g.id !== id));
         });
       return;
     }
@@ -336,80 +448,88 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const completeGoal = (goalId: string, date: string, reflection?: string) => {
-    if (isApiEnabled()) {
-      api
-        .post<{ completed: boolean; date: string; reflection?: string }>(`/api/goals/${goalId}/complete`, {
-          date,
-          reflection,
-        })
-        .then(({ completed }) => {
+    if (supabase) {
+      (async () => {
+        const existing = goals.find((g) => g.id === goalId)?.completions.find((c) => c.date === date);
+        if (existing) {
+          await supabase.from('goal_completions').delete().match({ goal_id: goalId, date });
           setGoals((prev) =>
-            prev.map((g) => {
-              if (g.id !== goalId) return g;
-              if (completed) {
-                return { ...g, completions: [...g.completions, { date, reflection }] };
-              }
-              return { ...g, completions: g.completions.filter((c) => c.date !== date) };
-            })
+            prev.map((g) => g.id === goalId ? { ...g, completions: g.completions.filter((c) => c.date !== date) } : g)
           );
-        })
-        .catch((err) => {
-          throw err;
-        });
+        } else {
+          await supabase.from('goal_completions').insert({ goal_id: goalId, date, reflection: reflection ?? null });
+          setGoals((prev) =>
+            prev.map((g) => g.id === goalId ? { ...g, completions: [...g.completions, { date, reflection }] } : g)
+          );
+        }
+      })();
       return;
     }
     setGoals((prev) =>
       prev.map((g) => {
         if (g.id !== goalId) return g;
-        const existing = g.completions.find((c) => c.date === date);
-        if (existing) {
-          return { ...g, completions: g.completions.filter((c) => c.date !== date) };
-        }
+        const ex = g.completions.find((c) => c.date === date);
+        if (ex) return { ...g, completions: g.completions.filter((c) => c.date !== date) };
         return { ...g, completions: [...g.completions, { date, reflection }] };
       })
     );
   };
 
+  // ── Check-ins ──
+
   const addCheckIn = (checkIn: Omit<CheckIn, 'id' | 'userId'>) => {
     if (!user) return;
-    if (isApiEnabled()) {
-      api
-        .post<CheckIn>('/api/check-ins', checkIn)
-        .then((newCheckIn) => setCheckIns((prev) => [newCheckIn, ...prev]))
-        .catch((err) => {
-          throw err;
-        });
+    if (supabase) {
+      (async () => {
+        const { data, error } = await supabase
+          .from('check_ins')
+          .insert({ user_id: user.id, date: checkIn.date, mood: checkIn.mood, reflection: checkIn.reflection })
+          .select('*, check_in_visibility(group_id)')
+          .single();
+        if (error) { console.error('addCheckIn', error); return; }
+        const newCheckIn = rowToCheckIn(data as CheckInRow);
+
+        if (checkIn.visibleToGroups?.length) {
+          await supabase.from('check_in_visibility').insert(
+            checkIn.visibleToGroups.map((gid) => ({ check_in_id: newCheckIn.id, group_id: gid }))
+          );
+          newCheckIn.visibleToGroups = checkIn.visibleToGroups;
+        }
+        setCheckIns((prev) => [newCheckIn, ...prev]);
+      })();
       return;
     }
-    const newCheckIn: CheckIn = {
-      ...checkIn,
-      id: `checkin_${Date.now()}`,
-      userId: user.id,
-    };
+    const newCheckIn: CheckIn = { ...checkIn, id: `checkin_${Date.now()}`, userId: user.id };
     setCheckIns((prev) => [newCheckIn, ...prev]);
   };
 
+  // ── Groups ──
+
   const createGroup = (name: string): Group => {
     if (!user) throw new Error('Must be logged in');
-    if (isApiEnabled()) {
+    if (supabase) {
       let created: Group = null!;
-      api
-        .post<Group>('/api/groups', { name })
-        .then((g) => {
-          created = g;
-          setGroups((prev) => [g, ...prev]);
-          return fetchUsersForGroups([g]);
-        })
-        .then((memberUsers) => {
-          setUsers((prev) => {
-            const byId = new Map(prev.map((u) => [u.id, u]));
-            memberUsers.forEach((u) => byId.set(u.id, u));
-            return [...byId.values()];
-          });
-        })
-        .catch((err) => {
-          throw err;
-        });
+      (async () => {
+        const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const { data, error } = await supabase
+          .from('groups')
+          .insert({ name, invite_code: inviteCode, created_by: user.id })
+          .select()
+          .single();
+        if (error) { console.error('createGroup', error); return; }
+
+        await supabase.from('group_members').insert({ group_id: data.id, user_id: user.id });
+
+        created = {
+          id: data.id,
+          name: data.name,
+          inviteCode: data.invite_code,
+          members: [user.id],
+          createdBy: data.created_by,
+          createdAt: data.created_at,
+        };
+        setGroups((prev) => [created, ...prev]);
+      })();
       return created;
     }
     const newGroup: Group = {
@@ -426,66 +546,50 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const joinGroup = async (inviteCode: string): Promise<boolean> => {
     if (!user) return false;
-    if (isApiEnabled()) {
-      const group = await api.post<Group>('/api/groups/join', { inviteCode: inviteCode.trim().toUpperCase() });
-      setGroups((prev) => {
-        const exists = prev.some((g) => g.id === group.id);
-        if (exists) return prev.map((g) => (g.id === group.id ? group : g));
-        return [group, ...prev];
-      });
-      const memberUsers = await fetchUsersForGroups([group]);
-      setUsers((prev) => {
-        const byId = new Map(prev.map((u) => [u.id, u]));
-        memberUsers.forEach((u) => byId.set(u.id, u));
-        return [...byId.values()];
-      });
+    if (supabase) {
+      const { data: group, error } = await supabase
+        .from('groups')
+        .select('id, name, invite_code, created_by, created_at')
+        .eq('invite_code', inviteCode.trim().toUpperCase())
+        .single();
+      if (error || !group) return false;
+
+      const { error: joinErr } = await supabase
+        .from('group_members')
+        .insert({ group_id: group.id, user_id: user.id });
+      if (joinErr && joinErr.code !== '23505') { console.error('joinGroup', joinErr); return false; }
+
+      await fetchGroups();
       return true;
     }
     const group = groups.find((g) => g.inviteCode === inviteCode);
     if (!group) return false;
     if (group.members.includes(user.id)) return true;
-    setGroups((prev) =>
-      prev.map((g) => (g.id === group.id ? { ...g, members: [...g.members, user.id] } : g))
-    );
+    setGroups((prev) => prev.map((g) => (g.id === group.id ? { ...g, members: [...g.members, user.id] } : g)));
     return true;
   };
 
   const leaveGroup = (groupId: string) => {
     if (!user) return;
-    if (isApiEnabled()) {
-      api
-        .post(`/api/groups/${groupId}/leave`)
-        .then(() => setGroups((prev) => prev.filter((g) => g.id !== groupId)))
-        .catch((err) => {
-          throw err;
+    if (supabase) {
+      supabase.from('group_members').delete().match({ group_id: groupId, user_id: user.id })
+        .then(({ error }) => {
+          if (error) { console.error('leaveGroup', error); return; }
+          setGroups((prev) => prev.filter((g) => g.id !== groupId));
         });
       return;
     }
-    setGroups((prev) =>
-      prev.map((g) => (g.id === groupId ? { ...g, members: g.members.filter((m) => m !== user.id) } : g))
-    );
+    setGroups((prev) => prev.map((g) => (g.id === groupId ? { ...g, members: g.members.filter((m) => m !== user.id) } : g)));
   };
 
   return (
     <AppContext.Provider
       value={{
-        user,
-        users,
-        goals,
-        checkIns,
-        groups,
-        apiReady,
-        login,
-        signup,
-        logout,
-        addGoal,
-        updateGoal,
-        deleteGoal,
-        completeGoal,
+        user, users, goals, checkIns, groups, apiReady,
+        login, signup, logout,
+        addGoal, updateGoal, deleteGoal, completeGoal,
         addCheckIn,
-        createGroup,
-        joinGroup,
-        leaveGroup,
+        createGroup, joinGroup, leaveGroup,
       }}
     >
       {children}

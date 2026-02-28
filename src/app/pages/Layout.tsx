@@ -5,7 +5,7 @@ import { BottomNav } from '../components/BottomNav';
 import { FAB } from '../components/FAB';
 import { WelcomeDialog } from '../components/WelcomeDialog';
 import { Login } from './Login';
-import { isApiEnabled } from '../api/client';
+import { isSupabaseEnabled } from '../lib/supabase';
 
 export const Layout: React.FC = () => {
   const { user, apiReady } = useApp();
@@ -27,7 +27,7 @@ export const Layout: React.FC = () => {
     setShowWelcome(false);
   };
 
-  if (isApiEnabled() && !apiReady) {
+  if (isSupabaseEnabled() && !apiReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#FFFBF7]">
         <div className="text-[#8A8A8A]">Loading...</div>
