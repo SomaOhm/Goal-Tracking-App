@@ -5,14 +5,14 @@ import { authMiddleware } from '../middleware/auth.js';
 export const checkInsRouter = Router();
 checkInsRouter.use(authMiddleware);
 
-function checkInRowToJson(row: Record<string, unknown>) {
+function checkInRowToJson(row: Record<string, unknown>): { id: string; userId: string; date: string; mood: number; reflection: string; visibleToGroups: string[] } {
   return {
-    id: row.id,
-    userId: row.user_id,
-    date: row.date,
+    id: String(row.id),
+    userId: String(row.user_id),
+    date: String(row.date),
     mood: Number(row.mood),
-    reflection: row.reflection ?? '',
-    visibleToGroups: [], // filled when needed
+    reflection: String(row.reflection ?? ''),
+    visibleToGroups: [],
   };
 }
 
@@ -38,7 +38,12 @@ checkInsRouter.get('/', async (req: Request, res: Response): Promise<void> => {
     );
     const byId: Record<string, string[]> = {};
     for (const c of checkIns) byId[c.id] = [];
-    for (const row of vis.rows) byId[row.check_in_id].push(row.group_id);
+    for (const row of vis.rows) {
+      const r = row as Record<string, unknown>;
+      const cid = String(r.check_in_id);
+      if (!byId[cid]) byId[cid] = [];
+      byId[cid].push(String(r.group_id));
+    }
     for (const c of checkIns) c.visibleToGroups = byId[c.id] ?? [];
     res.json(checkIns);
   } finally {

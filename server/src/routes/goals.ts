@@ -5,17 +5,28 @@ import { authMiddleware } from '../middleware/auth.js';
 export const goalsRouter = Router();
 goalsRouter.use(authMiddleware);
 
-function goalRowToJson(row: Record<string, unknown>) {
+function goalRowToJson(row: Record<string, unknown>): {
+  id: string;
+  userId: string;
+  title: string;
+  description: string;
+  frequency: string;
+  customDays?: number[];
+  checklist?: string[];
+  completions: { date: string; reflection?: string }[];
+  visibleToGroups: string[];
+  createdAt: string;
+} {
   return {
-    id: row.id,
-    userId: row.user_id,
-    title: row.title,
-    description: row.description ?? '',
-    frequency: row.frequency,
-    customDays: row.custom_days ?? undefined,
-    checklist: row.checklist ?? undefined,
-    completions: [], // filled separately
-    visibleToGroups: [], // filled separately
+    id: String(row.id),
+    userId: String(row.user_id),
+    title: String(row.title),
+    description: String(row.description ?? ''),
+    frequency: String(row.frequency),
+    customDays: row.custom_days as number[] | undefined,
+    checklist: row.checklist as string[] | undefined,
+    completions: [],
+    visibleToGroups: [],
     createdAt: (row.created_at as Date).toISOString(),
   };
 }
@@ -38,14 +49,20 @@ async function attachCompletionsAndVisibility(goals: Record<string, unknown>[], 
   for (const g of goals) compByGoal[g.id as string] = [];
   for (const g of goals) visByGoal[g.id as string] = [];
   for (const r of compRes.rows) {
-    const dateStr = r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date);
-    compByGoal[r.goal_id].push({
+    const row = r as Record<string, unknown>;
+    const goalId = String(row.goal_id);
+    const dateStr = row.date instanceof Date ? (row.date as Date).toISOString().slice(0, 10) : String(row.date);
+    if (!compByGoal[goalId]) compByGoal[goalId] = [];
+    compByGoal[goalId].push({
       date: dateStr,
-      reflection: r.reflection ?? undefined,
+      reflection: row.reflection as string | undefined,
     });
   }
   for (const r of visRes.rows) {
-    visByGoal[r.goal_id].push(r.group_id);
+    const row = r as Record<string, unknown>;
+    const goalId = String(row.goal_id);
+    if (!visByGoal[goalId]) visByGoal[goalId] = [];
+    visByGoal[goalId].push(String(row.group_id));
   }
   for (const g of goals) {
     (g as Record<string, unknown>).completions = compByGoal[g.id as string] ?? [];
