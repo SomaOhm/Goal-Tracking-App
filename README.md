@@ -24,3 +24,29 @@ Goal-Tracking-App
 ### Mentor App
 - Analytics dashboard for all members
 - AI chatbot to discuss plans and interventions based on collected data
+
+## File structure
+
+Top-level overview of the repository (key files and folders):
+
+```
+Goal-Tracking-App/
+├── backend/
+│   ├── app/
+│   │   ├── main.py           # FastAPI (or app) entrypoints
+│   │   ├── gemini.py         # LLM / AI integration helpers
+│   │   ├── database.py       # DB connection and setup
+│   │   └── models.py         # Pydantic / ORM models
+│   ├── worker/
+│   │   ├── celery_app.py     # Celery configuration
+│   │   └── tasks.py          # Background tasks
+│   └── requirements.txt      # Python dependencies
+├── backend/.env              # environment variables for backend (not committed)
+├── README.md
+└── .git/
+
+```
+
+Notes:
+- This shows the main backend layout; frontend or mobile client code may be in a separate folder when added.
+- Update this section as new top-level folders (e.g. `mobile/`, `frontend/`, `infra/`) are introduced.
