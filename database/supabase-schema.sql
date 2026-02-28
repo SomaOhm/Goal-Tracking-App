@@ -120,6 +120,13 @@ create policy "Users can read own goal completions"
   using (exists (
     select 1 from public.goals where goals.id = goal_completions.goal_id and goals.user_id = auth.uid()
   ));
+create policy "Group members can read shared goal completions"
+  on public.goal_completions for select
+  using (exists (
+    select 1 from public.goal_visibility gv
+    join public.group_members gm on gm.group_id = gv.group_id
+    where gv.goal_id = goal_completions.goal_id and gm.user_id = auth.uid()
+  ));
 create policy "Users can insert own goal completions"
   on public.goal_completions for insert
   with check (exists (
@@ -145,12 +152,15 @@ create policy "Authenticated users can create groups"
 create policy "Creators can delete own groups"
   on public.groups for delete using (auth.uid() = created_by);
 
--- group_members
+-- group_members (using security definer to avoid infinite recursion)
+create or replace function public.is_group_member(gid uuid)
+returns boolean as $$
+  select exists (select 1 from public.group_members where group_id = gid and user_id = auth.uid());
+$$ language sql security definer stable;
+
 create policy "Members can see group membership"
   on public.group_members for select
-  using (exists (
-    select 1 from public.group_members gm where gm.group_id = group_members.group_id and gm.user_id = auth.uid()
-  ));
+  using (public.is_group_member(group_id));
 create policy "Authenticated users can join groups"
   on public.group_members for insert with check (auth.uid() = user_id);
 create policy "Users can leave groups"
@@ -181,7 +191,29 @@ create policy "Group members can see shared check-ins"
   ));
 
 -- =====================
--- PART 5: TRIGGER
+-- PART 5: RPC FUNCTIONS (shared data across groups)
+-- =====================
+
+create or replace function public.get_shared_goals()
+returns setof public.goals as $$
+  select distinct g.*
+  from public.goals g
+  join public.goal_visibility gv on gv.goal_id = g.id
+  join public.group_members gm on gm.group_id = gv.group_id
+  where gm.user_id = auth.uid() and g.user_id != auth.uid();
+$$ language sql security definer stable;
+
+create or replace function public.get_shared_check_ins()
+returns setof public.check_ins as $$
+  select distinct ci.*
+  from public.check_ins ci
+  join public.check_in_visibility civ on civ.check_in_id = ci.id
+  join public.group_members gm on gm.group_id = civ.group_id
+  where gm.user_id = auth.uid() and ci.user_id != auth.uid();
+$$ language sql security definer stable;
+
+-- =====================
+-- PART 6: TRIGGER
 -- =====================
 
 create or replace function public.handle_new_user()

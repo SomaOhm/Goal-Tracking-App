@@ -12,39 +12,25 @@ export const Layout: React.FC = () => {
   const [showWelcome, setShowWelcome] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      const hasSeenWelcome = localStorage.getItem(`welcome_${user.id}`);
-      if (!hasSeenWelcome) {
-        setShowWelcome(true);
-      }
-    }
+    if (user && !localStorage.getItem(`welcome_${user.id}`)) setShowWelcome(true);
   }, [user]);
 
-  const handleCloseWelcome = () => {
-    if (user) {
-      localStorage.setItem(`welcome_${user.id}`, 'true');
-    }
+  const closeWelcome = () => {
+    if (user) localStorage.setItem(`welcome_${user.id}`, 'true');
     setShowWelcome(false);
   };
 
-  if (isSupabaseEnabled() && !apiReady) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FFFBF7]">
-        <div className="text-[#8A8A8A]">Loading...</div>
-      </div>
-    );
-  }
+  if (isSupabaseEnabled() && !apiReady)
+    return <div className="min-h-screen flex items-center justify-center bg-[#FFFBF7]"><div className="text-[#8A8A8A]">Loading...</div></div>;
 
-  if (!user) {
-    return <Login />;
-  }
+  if (!user) return <Login />;
 
   return (
     <div className="min-h-screen">
       <Outlet />
       <BottomNav />
       <FAB />
-      <WelcomeDialog open={showWelcome} onClose={handleCloseWelcome} />
+      <WelcomeDialog open={showWelcome} onClose={closeWelcome} />
     </div>
   );
 };
