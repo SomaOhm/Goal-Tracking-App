@@ -1,57 +1,27 @@
-from worker.celery_app import celery
-from app.database import mongo_db
-from app.gemini import review_progress
-from datetime import datetime, timedelta
+"""
+Celery task imports.
 
+For goal reviews, see: worker.review_tasks
+For Postgres → Snowflake sync, see: worker.sync_tasks
+"""
 
-@celery.task
-def weekly_review():
+# Import all tasks from submodules to register with Celery
+from worker.review_tasks import (
+    weekly_goal_review,
+    daily_goal_reminder,
+    monthly_progress_report
+)
+from worker.sync_tasks import (
+    sync_checkins_to_snowflake,
+    sync_goals_to_snowflake,
+    sync_users_to_snowflake
+)
 
-    # example: review all active users
-    users = mongo_db.users.find({})
-
-    for user in users:
-        checkins = mongo_db.checkins.find({
-            "user_id": user["_id"],
-            "timestamp": {
-                "$gte": datetime.utcnow() - timedelta(days=7)
-            }
-        })
-
-        context = list(checkins)
-        ai_message = review_progress(str(context))
-
-        mongo_db.group_feed.insert_one({
-            "user_id": user["_id"],
-            "content": ai_message,
-            "type": "ai_coach",
-            "timestamp": datetime.utcnow()
-        })
-        
-        @celery.task
-        
-def sync_checkins_to_snowflake():
-
-    from app.database import get_snowflake_connection
-
-    conn = get_snowflake_connection()
-    cursor = conn.cursor()
-
-    new_checkins = mongo_db.checkins.find({
-        "synced": {"$ne": True}
-    })
-
-    for row in new_checkins:
-        cursor.execute("""
-            INSERT INTO staging_checkins VALUES (%s, %s, %s, %s)
-        """, (
-            row["_id"],
-            row["goal_id"],
-            row["completed"],
-            row["timestamp"]
-        ))
-
-        mongo_db.checkins.update_one(
-            {"_id": row["_id"]},
-            {"$set": {"synced": True}}
-        )
+__all__ = [
+    "weekly_goal_review",
+    "daily_goal_reminder",
+    "monthly_progress_report",
+    "sync_checkins_to_snowflake",
+    "sync_goals_to_snowflake",
+    "sync_users_to_snowflake",
+]
