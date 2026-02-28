@@ -11,9 +11,6 @@ People who want to establish and maintain habits, track personal goals (mental h
 ### Core Value Proposition
 A seamless goal-tracking experience paired with a transparent, automated accountability loop to an external professional or partner. Includes an integrated reflective diary and an AI chat agent for internal guidance and support.
 
-### Proposed Name
-Goal-Tracking-App
-
 ## Features In Progress
 
 ### Member App
@@ -25,74 +22,46 @@ Goal-Tracking-App
 - Analytics dashboard for all members
 - AI chatbot to discuss plans and interventions based on collected data
 
-## Running the Frontend (MindBuddy UI)
+## Running the App
 
-This is the code bundle for the Mental Health Accountability App. The original project is available at https://www.figma.com/design/OmoKuWijoSjf4mXtmOrVWE/Mental-Health-Accountability-App.
+### Frontend (React/Vite)
 
-### Frontend only (demo mode)
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-Run `npm i` to install the dependencies.
+Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `frontend/.env` to connect to Supabase. Without them, the app runs in localStorage demo mode.
 
-Run `npm run dev` to start the development server.
+### Backend (Python/FastAPI)
 
-To use in-memory/localStorage data only, do not set `VITE_API_URL`. Sign up with any email (no password required in demo mode).
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
 
-### With backend (PostgreSQL on DigitalOcean)
+Set environment variables in `backend/.env` (see `backend/.env.example`).
 
-1. **Server**
-   - `cd server`
-   - Copy `.env.example` to `.env` and set `DATABASE_URL`, `JWT_SECRET` (min 32 chars), and optionally `CORS_ORIGIN` and `PORT`.
-   - Run `npm install`
-   - Run `npm run db:init` to create tables (once per database).
-   - Run `npm run dev` to start the API at http://localhost:3001.
+### Database (Supabase)
 
-2. **Frontend**
-   - In the project root, set `VITE_API_URL=http://localhost:3001` in `.env` (or use the provided `.env`).
-   - Run `npm i` and `npm run dev`.
+Run `database/supabase-schema.sql` in the Supabase SQL Editor to create all tables, RLS policies, and triggers.
 
-3. **Auth**
-   - Sign up with email + password; the backend stores hashed passwords and issues a JWT. Log in with the same credentials.
-
-### Database connection timeout? (DigitalOcean)
-
-If you see **"Request timed out"** or **ETIMEDOUT** when using a DigitalOcean managed database, the DB firewall is blocking your IP. The database only accepts connections from **Trusted Sources**.
-
-1. In [DigitalOcean](https://cloud.digitalocean.com/) go to **Databases** → your cluster → **Settings**.
-2. Under **Trusted Sources**, click **Edit**.
-3. Either:
-   - **Add your current IP**: click **Add current IP address**, or  
-   - **Allow all** (for testing only): add `0.0.0.0/0`.
-4. Save. Wait a minute, then try signing up again.
-
-Your app runs on your machine, so the IP that must be allowed is the one your machine uses to reach the internet (your home/office or VPN). If you deploy the backend to a server later, add that server's IP to Trusted Sources as well.
-
-## File structure
-
-Top-level overview of the repository (key files and folders):
+## File Structure
 
 ```
 Goal-Tracking-App/
-├── backend/                  # Python/FastAPI backend (mentor/member APIs, AI chat)
+├── frontend/             # React/Vite frontend
+│   ├── src/
+│   ├── index.html
+│   ├── package.json
+│   └── vite.config.ts
+├── backend/              # Python/FastAPI backend (mentor/member APIs, AI chat)
 │   ├── app/
-│   │   ├── main.py           # FastAPI entrypoints
-│   │   ├── gemini.py         # LLM / AI integration helpers
-│   │   ├── database.py       # DB connection and setup
-│   │   └── models.py         # Pydantic / ORM models
 │   ├── worker/
-│   │   ├── celery_app.py     # Celery configuration
-│   │   └── tasks.py          # Background tasks
-│   └── requirements.txt      # Python dependencies
-├── server/                   # Node.js/Express API (auth, goals, check-ins, groups)
-├── src/                      # React/Vite frontend
-├── guidelines/               # Design guidelines
-├── index.html
-├── package.json
-├── vite.config.ts
-└── README.md
+│   └── requirements.txt
+├── database/             # Supabase schema and migrations
+│   └── supabase-schema.sql
+└── guidelines/           # Design guidelines
 ```
-
-Notes:
-- `backend/` contains the Python/FastAPI services (mentor app, AI chat, analytics).
-- `server/` contains the Node.js/Express API (auth, goals, check-ins, groups).
-- `src/` contains the React frontend.
-- Update this section as new top-level folders (e.g. `mobile/`, `infra/`) are introduced.
