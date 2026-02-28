@@ -142,6 +142,8 @@ create policy "Anyone can read groups"
   on public.groups for select using (true);
 create policy "Authenticated users can create groups"
   on public.groups for insert with check (auth.uid() = created_by);
+create policy "Creators can delete own groups"
+  on public.groups for delete using (auth.uid() = created_by);
 
 -- group_members
 create policy "Members can see group membership"

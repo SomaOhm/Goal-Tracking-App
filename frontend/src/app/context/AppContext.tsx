@@ -58,6 +58,7 @@ interface AppContextType {
   createGroup: (name: string) => Group;
   joinGroup: (inviteCode: string) => Promise<boolean>;
   leaveGroup: (groupId: string) => void;
+  deleteGroup: (groupId: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -582,6 +583,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setGroups((prev) => prev.map((g) => (g.id === groupId ? { ...g, members: g.members.filter((m) => m !== user.id) } : g)));
   };
 
+  const deleteGroup = (groupId: string) => {
+    if (!user) return;
+    const group = groups.find((g) => g.id === groupId);
+    if (!group || group.createdBy !== user.id) return;
+    if (supabase) {
+      supabase.from('groups').delete().eq('id', groupId)
+        .then(({ error }) => {
+          if (error) { console.error('deleteGroup', error); return; }
+          setGroups((prev) => prev.filter((g) => g.id !== groupId));
+        });
+      return;
+    }
+    setGroups((prev) => prev.filter((g) => g.id !== groupId));
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -589,7 +605,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         login, signup, logout,
         addGoal, updateGoal, deleteGoal, completeGoal,
         addCheckIn,
-        createGroup, joinGroup, leaveGroup,
+        createGroup, joinGroup, leaveGroup, deleteGroup,
       }}
     >
       {children}

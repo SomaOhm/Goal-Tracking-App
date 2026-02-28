@@ -4,12 +4,12 @@ import { Card } from '../components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
-import { Users, Plus, Copy, Check, UserPlus, Settings, Heart, Flame, Calendar } from 'lucide-react';
+import { Users, Plus, Copy, Check, UserPlus, Settings, Heart, Flame, Calendar, Trash2, LogOut } from 'lucide-react';
 import { format } from 'date-fns';
 import { Switch } from '../components/ui/switch';
 
 export const Groups: React.FC = () => {
-  const { user, groups, users, goals, checkIns, createGroup, joinGroup, updateGoal } = useApp();
+  const { user, groups, users, goals, checkIns, createGroup, joinGroup, leaveGroup, deleteGroup, updateGoal } = useApp();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
@@ -140,7 +140,7 @@ export const Groups: React.FC = () => {
           <p className="text-sm text-[#8A8A8A] mb-4">Create a group or join one with an invite code</p>
         </Card>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-4 max-h-[calc(100vh-220px)] overflow-y-auto pr-1">
           {myGroups.map((group) => {
             const members = getGroupMembers(group.id);
             
@@ -325,16 +325,17 @@ export const Groups: React.FC = () => {
       <Dialog open={settingsDialogOpen} onOpenChange={setSettingsDialogOpen}>
         <DialogContent className="rounded-3xl max-w-md mx-4 bg-white">
           <DialogHeader>
-            <DialogTitle className="text-2xl text-[#4A4A4A]">Goal Visibility</DialogTitle>
+            <DialogTitle className="text-2xl text-[#4A4A4A]">Group Settings</DialogTitle>
           </DialogHeader>
           
           <div className="space-y-4 mt-4">
-            <p className="text-sm text-[#8A8A8A]">Choose which goals are visible to this group</p>
+            <p className="text-sm text-[#8A8A8A] font-medium">Goal Visibility</p>
+            <p className="text-xs text-[#8A8A8A]">Choose which goals are visible to this group</p>
             
             {myGoals.length === 0 ? (
               <p className="text-center text-[#8A8A8A] py-4">No goals yet</p>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-3 max-h-48 overflow-y-auto">
                 {myGoals.map((goal) => (
                   <div 
                     key={goal.id}
@@ -349,6 +350,40 @@ export const Groups: React.FC = () => {
                 ))}
               </div>
             )}
+
+            <div className="border-t border-[#F0F0F0] pt-4 space-y-3">
+              {selectedGroup && groups.find(g => g.id === selectedGroup)?.createdBy === user?.id ? (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (confirm('Delete this group? All members will be removed.')) {
+                      deleteGroup(selectedGroup);
+                      setSettingsDialogOpen(false);
+                      setSelectedGroup(null);
+                    }
+                  }}
+                  className="w-full rounded-2xl h-12 border-red-200 text-red-500 hover:bg-red-50 hover:text-red-600"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Group
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (selectedGroup && confirm('Leave this group?')) {
+                      leaveGroup(selectedGroup);
+                      setSettingsDialogOpen(false);
+                      setSelectedGroup(null);
+                    }
+                  }}
+                  className="w-full rounded-2xl h-12 border-orange-200 text-orange-500 hover:bg-orange-50 hover:text-orange-600"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Leave Group
+                </Button>
+              )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
