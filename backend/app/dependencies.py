@@ -1,10 +1,17 @@
 """Database session dependency for FastAPI routes."""
 
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.database import AsyncSessionLocal
+from sqlalchemy.orm import Session
+from app.database import SessionLocal
 
 
-async def get_db() -> AsyncSession:
-    """Dependency for getting async database session."""
-    async with AsyncSessionLocal() as session:
+def get_db() -> Session:
+    """Dependency for getting database session.
+    
+    Creates a new database session for each request and ensures
+    it's properly closed after use.
+    """
+    session = SessionLocal()
+    try:
         yield session
+    finally:
+        session.close()

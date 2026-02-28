@@ -22,7 +22,7 @@ if config.config_file_name is not None:
 from app.database import Base
 target_metadata = Base.metadata
 
-# For autogenerate to work
+# For autogenerate to work with Supabase PostgreSQL
 config.set_main_option("sqlalchemy.url", os.getenv("DATABASE_URL", "postgresql://localhost/goaltracking"))
 
 

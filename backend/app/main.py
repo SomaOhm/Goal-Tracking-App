@@ -13,9 +13,9 @@ app = FastAPI(
 
 # Create tables on startup
 @app.on_event("startup")
-async def startup():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+def startup():
+    """Create database tables on application startup."""
+    Base.metadata.create_all(bind=engine)
 
 
 # Add CORS middleware

@@ -3,6 +3,8 @@ from functools import lru_cache
 
 
 class Settings(BaseSettings):
+    # Supabase PostgreSQL Connection
+    # Format: postgresql://postgres.[project-id]:[password]@db.[project-id].supabase.co:5432/postgres
     DATABASE_URL: str = "postgresql://localhost/goaltracking"
     
     class Config:

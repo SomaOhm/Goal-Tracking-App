@@ -1,7 +1,7 @@
 """Chat API endpoints for user-AI interactions."""
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from uuid import UUID
 from pydantic import BaseModel
 from datetime import datetime
@@ -27,9 +27,9 @@ class ChatResponse(BaseModel):
 
 
 @router.post("/", response_model=ChatResponse)
-async def chat(
+def chat(
     data: ChatRequest,
-    session: AsyncSession = Depends(get_db)
+    session: Session = Depends(get_db)
 ):
     """
     User-AI accountability coach interaction.
@@ -42,7 +42,7 @@ async def chat(
     """
     try:
         # Build context from database
-        context = await build_goal_context(session, data.user_id)
+        context = build_goal_context(session, data.user_id)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Could not load user context: {str(e)}")
     
@@ -77,7 +77,7 @@ Respond with:
 3. 1-2 action steps for next"""
     
     try:
-        ai_reply = await review_progress(prompt)
+        ai_reply = review_progress(prompt)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Gemini error: {str(e)}")
     
@@ -86,7 +86,7 @@ Respond with:
     
     try:
         # Store in one combined record with both messages
-        ai_msg = await message_repo.create(
+        ai_msg = message_repo.create(
             user_id=data.user_id,
             group_id=data.group_id,
             content=data.message,
@@ -96,7 +96,7 @@ Respond with:
         )
         
         # Store AI reply
-        ai_reply_msg = await message_repo.create(
+        ai_reply_msg = message_repo.create(
             user_id=data.user_id,
             group_id=data.group_id,
             content=ai_reply,
@@ -114,14 +114,14 @@ Respond with:
 
 
 @router.get("/{user_id}/history")
-async def get_chat_history(
+def get_chat_history(
     user_id: UUID,
     limit: int = 20,
-    session: AsyncSession = Depends(get_db)
+    session: Session = Depends(get_db)
 ):
     """Get chat history for a user."""
     message_repo = MessageRepository(session)
-    messages = await message_repo.get_by_user(user_id, limit=limit)
+    messages = message_repo.get_by_user(user_id, limit=limit)
     
     return [
         {

@@ -1,7 +1,7 @@
 """Mentor chat API endpoints for mentor-AI-patient interactions."""
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from uuid import UUID
 from pydantic import BaseModel
 from datetime import datetime
@@ -30,9 +30,9 @@ class MentorChatResponse(BaseModel):
 
 
 @router.post("/", response_model=MentorChatResponse)
-async def mentor_chat(
+def mentor_chat(
     data: MentorChatRequest,
-    session: AsyncSession = Depends(get_db)
+    session: Session = Depends(get_db)
 ):
     """
     Mentor-AI interaction for patient oversight.
@@ -53,7 +53,7 @@ async def mentor_chat(
     
     # Load operational context from Postgres
     try:
-        operational_context = await build_mentor_context(session, data.patient_id)
+        operational_context = build_mentor_context(session, data.patient_id)
         sources_used.append("postgresql")
     except Exception as e:
         operational_context = {"error": str(e)}
@@ -101,7 +101,7 @@ async def mentor_chat(
     Provide coaching advice:"""
     
     try:
-        ai_reply = await mentor_copilot(str(context), data.message)
+        ai_reply = mentor_copilot(str(context), data.message)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Gemini error: {str(e)}")
     
@@ -121,7 +121,7 @@ async def mentor_chat(
         created_at=datetime.utcnow()
     )
     session.add(interaction)
-    await session.commit()
+    session.commit()
     
     return MentorChatResponse(
         ai_reply=ai_reply,
@@ -132,16 +132,16 @@ async def mentor_chat(
 
 
 @router.get("/{mentor_id}/patients")
-async def list_mentor_patients(
+def list_mentor_patients(
     mentor_id: UUID,
-    session: AsyncSession = Depends(get_db)
+    session: Session = Depends(get_db)
 ):
     """Get all patients for a mentor with their status."""
     from app.repositories.user_repo import UserRepository
     from sqlalchemy import select
     from app.models import User
     
-    result = await session.execute(
+    result = session.execute(
         select(User).where(User.mentor_id == mentor_id)
     )
     patients = result.scalars().all()
@@ -166,16 +166,16 @@ async def list_mentor_patients(
 
 
 @router.get("/{mentor_id}/interactions/{patient_id}")
-async def get_interaction_history(
+def get_interaction_history(
     mentor_id: UUID,
     patient_id: UUID,
     limit: int = 10,
-    session: AsyncSession = Depends(get_db)
+    session: Session = Depends(get_db)
 ):
     """Get mentor-AI interaction history for a patient."""
     from sqlalchemy import select, and_
     
-    result = await session.execute(
+    result = session.execute(
         select(MentorInteraction)
         .where(and_(
             MentorInteraction.mentor_id == mentor_id,

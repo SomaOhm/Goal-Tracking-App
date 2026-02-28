@@ -1,7 +1,7 @@
 """Dashboard API endpoints for analytics and insights."""
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from uuid import UUID
 
 from app.dependencies import get_db
@@ -16,23 +16,23 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
 @router.get("/user/{user_id}/goals")
-async def get_user_dashboard(
+def get_user_dashboard(
     user_id: UUID,
-    session: AsyncSession = Depends(get_db)
+    session: Session = Depends(get_db)
 ):
     """Get user's goal dashboard with context."""
-    context = await build_goal_context(session, user_id)
+    context = build_goal_context(session, user_id)
     return context
 
 
 @router.get("/mentor/{mentor_id}/patient/{user_id}")
-async def get_mentor_dashboard(
+def get_mentor_dashboard(
     mentor_id: UUID,
     user_id: UUID,
-    session: AsyncSession = Depends(get_db)
+    session: Session = Depends(get_db)
 ):
     """Get mentor's view of a patient's dashboard."""
-    context = await build_mentor_context(session, user_id)
+    context = build_mentor_context(session, user_id)
     
     # Add Snowflake analytics
     try:
@@ -45,9 +45,9 @@ async def get_mentor_dashboard(
 
 
 @router.get("/analytics/{user_id}")
-async def get_user_analytics_dashboard(
+def get_user_analytics_dashboard(
     user_id: UUID,
-    session: AsyncSession = Depends(get_db)
+    session: Session = Depends(get_db)
 ):
     """Get user-specific analytics from Snowflake."""
     try:
@@ -58,12 +58,12 @@ async def get_user_analytics_dashboard(
 
 
 @router.get("/sync-status")
-async def get_sync_status(
-    session: AsyncSession = Depends(get_db)
+def get_sync_status(
+    session: Session = Depends(get_db)
 ):
     """Get status of unsynced check-ins."""
     repo = CheckinRepository(session)
-    unsynced = await repo.get_unsynced()
+    unsynced = repo.get_unsynced()
     return {
         "total_unsynced": len(unsynced),
         "checkins": unsynced

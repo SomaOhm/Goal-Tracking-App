@@ -1,27 +1,27 @@
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from app.config import settings
 import snowflake.connector
 import os
 
-DATABASE_URL = settings.DATABASE_URL.replace(
-    "postgresql://", "postgresql+asyncpg://"
+# Supabase PostgreSQL connection (synchronous engine)
+# Supabase provides a PostgreSQL database that works with SQLAlchemy
+DATABASE_URL = settings.DATABASE_URL
+
+engine = create_engine(
+    DATABASE_URL,
+    echo=False,
+    pool_pre_ping=True,  # Verify connection before using
+    pool_size=5,
+    max_overflow=10
 )
 
-engine = create_async_engine(DATABASE_URL, echo=False)
-
-AsyncSessionLocal = sessionmaker(
-    engine,
-    expire_on_commit=False,
-    class_=AsyncSession
+SessionLocal = sessionmaker(
+    bind=engine,
+    expire_on_commit=False
 )
 
 Base = declarative_base()
-
-
-async def get_db():
-    async with AsyncSessionLocal() as session:
-        yield session
 
 
 def get_snowflake_connection():

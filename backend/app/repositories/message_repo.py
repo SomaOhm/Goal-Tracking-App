@@ -1,6 +1,6 @@
 """Message repository for data access operations."""
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy import select
 from app.models import Message
 
@@ -8,10 +8,10 @@ from app.models import Message
 class MessageRepository:
     """Repository for message data access."""
 
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: Session):
         self.session = session
 
-    async def create(
+    def create(
         self, 
         user_id, 
         group_id, 
@@ -31,20 +31,20 @@ class MessageRepository:
             context_used=context_used
         )
         self.session.add(message)
-        await self.session.commit()
-        await self.session.refresh(message)
+        self.session.commit()
+        self.session.refresh(message)
         return message
 
-    async def get_by_id(self, message_id) -> Message | None:
+    def get_by_id(self, message_id) -> Message | None:
         """Get message by ID."""
-        result = await self.session.execute(
+        result = self.session.execute(
             select(Message).where(Message.id == message_id)
         )
         return result.scalar_one_or_none()
 
-    async def get_by_user(self, user_id, limit: int = 50) -> list[Message]:
+    def get_by_user(self, user_id, limit: int = 50) -> list[Message]:
         """Get recent messages for a user."""
-        result = await self.session.execute(
+        result = self.session.execute(
             select(Message)
             .where(Message.user_id == user_id)
             .order_by(Message.created_at.desc())
@@ -52,9 +52,9 @@ class MessageRepository:
         )
         return result.scalars().all()
 
-    async def get_by_group(self, group_id, limit: int = 50) -> list[Message]:
+    def get_by_group(self, group_id, limit: int = 50) -> list[Message]:
         """Get recent messages for a group."""
-        result = await self.session.execute(
+        result = self.session.execute(
             select(Message)
             .where(Message.group_id == group_id)
             .order_by(Message.created_at.desc())
@@ -62,20 +62,20 @@ class MessageRepository:
         )
         return result.scalars().all()
 
-    async def get_conversation_pairs(self, user_id, limit: int = 20) -> list[tuple]:
+    def get_conversation_pairs(self, user_id, limit: int = 20) -> list[tuple]:
         """Get user-AI message pairs for conversation history."""
-        messages = await self.get_by_user(user_id, limit=limit * 2)
+        messages = self.get_by_user(user_id, limit=limit * 2)
         
         # Return messages in chronological order
         messages_sorted = list(reversed(messages))
         
         return messages_sorted
 
-    async def delete(self, message_id) -> bool:
+    def delete(self, message_id) -> bool:
         """Delete a message."""
-        message = await self.get_by_id(message_id)
+        message = self.get_by_id(message_id)
         if message:
-            await self.session.delete(message)
-            await self.session.commit()
+            self.session.delete(message)
+            self.session.commit()
             return True
         return False

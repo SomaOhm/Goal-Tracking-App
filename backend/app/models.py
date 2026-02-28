@@ -1,5 +1,4 @@
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Text, Integer, JSON, Float
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Text, Integer, JSON, Float, Uuid
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -9,9 +8,9 @@ from app.database import Base
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String, nullable=False)
-    mentor_id = Column(UUID(as_uuid=True), nullable=True)
+    mentor_id = Column(Uuid(as_uuid=True), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -24,9 +23,9 @@ class User(Base):
 class Goal(Base):
     __tablename__ = "goals"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    group_id = Column(UUID(as_uuid=True), nullable=True)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    group_id = Column(Uuid(as_uuid=True), nullable=True)
     title = Column(String, nullable=False)
     description = Column(Text)
     category = Column(String)  # fitness, mental_health, cs_prep, productivity
@@ -46,8 +45,8 @@ class Goal(Base):
 class Subgoal(Base):
     __tablename__ = "subgoals"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    goal_id = Column(UUID(as_uuid=True), ForeignKey("goals.id"), nullable=False)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    goal_id = Column(Uuid(as_uuid=True), ForeignKey("goals.id"), nullable=False)
     title = Column(String, nullable=False)
     description = Column(Text)
     status = Column(String, default="pending")  # pending, in_progress, completed
@@ -60,8 +59,8 @@ class Subgoal(Base):
 class Habit(Base):
     __tablename__ = "habits"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    goal_id = Column(UUID(as_uuid=True), ForeignKey("goals.id"), nullable=False)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    goal_id = Column(Uuid(as_uuid=True), ForeignKey("goals.id"), nullable=False)
     title = Column(String, nullable=False)
     description = Column(Text)
     frequency = Column(String)  # daily, weekly, custom
@@ -75,9 +74,9 @@ class Habit(Base):
 class Checkin(Base):
     __tablename__ = "checkins"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    goal_id = Column(UUID(as_uuid=True), ForeignKey("goals.id"), nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    goal_id = Column(Uuid(as_uuid=True), ForeignKey("goals.id"), nullable=False)
+    user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
     completed = Column(Boolean, nullable=False)
     notes = Column(Text, nullable=True)
     timestamp = Column(DateTime, default=datetime.utcnow)
@@ -92,9 +91,9 @@ class Checkin(Base):
 class Message(Base):
     __tablename__ = "messages"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    group_id = Column(UUID(as_uuid=True), nullable=True)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    group_id = Column(Uuid(as_uuid=True), nullable=True)
     user_message = Column(Text, nullable=True)
     ai_reply = Column(Text, nullable=True)
     is_ai = Column(Boolean, default=False)
@@ -108,8 +107,8 @@ class Message(Base):
 class JournalEntry(Base):
     __tablename__ = "journal_entries"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
     text = Column(Text, nullable=False)
     sentiment_score = Column(Float, nullable=True)  # Computed sentiment (-1 to 1)
     mood_tags = Column(JSON, nullable=True)  # ["happy", "stressed", "motivated"]
@@ -122,9 +121,9 @@ class JournalEntry(Base):
 class GroupFeedPost(Base):
     __tablename__ = "group_feed_posts"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    group_id = Column(UUID(as_uuid=True), nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    group_id = Column(Uuid(as_uuid=True), nullable=False)
+    user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
     content = Column(Text, nullable=False)
     post_type = Column(String)  # human, ai_coach, milestone
     metadata = Column(JSON, nullable=True)
@@ -134,9 +133,9 @@ class GroupFeedPost(Base):
 class GoalPlanSuggestion(Base):
     __tablename__ = "goal_plan_suggestions"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    goal_id = Column(UUID(as_uuid=True), ForeignKey("goals.id"), nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    goal_id = Column(Uuid(as_uuid=True), ForeignKey("goals.id"), nullable=False)
+    user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
     suggestion_type = Column(String)  # adjustment, new_subgoal, new_habit
     ai_suggestion = Column(JSON, nullable=False)  # Structured suggestion from Gemini
     accepted = Column(Boolean, nullable=True)
@@ -147,9 +146,9 @@ class GoalPlanSuggestion(Base):
 class MentorInteraction(Base):
     __tablename__ = "mentor_interactions"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    mentor_id = Column(UUID(as_uuid=True), nullable=False)
-    patient_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    mentor_id = Column(Uuid(as_uuid=True), nullable=False)
+    patient_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
     mode = Column(String)  # quick_check, deep_dive, risk_intervention
     mentor_message = Column(Text, nullable=False)
     ai_reply = Column(Text, nullable=False)

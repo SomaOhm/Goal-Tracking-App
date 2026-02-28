@@ -1,31 +1,31 @@
 """Context builder for constructing AI prompt context from user data."""
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy import select
 from app.models import Goal, Checkin, Message, JournalEntry, Subgoal, Habit
 from datetime import datetime, timedelta
 
 
-async def build_goal_context(session: AsyncSession, user_id) -> dict:
+def build_goal_context(session: Session, user_id) -> dict:
     """
     Build context for goal-related AI operations.
     
     Args:
-        session: AsyncSession for database queries
+        session: Session for database queries
         user_id: ID of the user
         
     Returns:
         Dictionary containing user's goals and recent check-ins
     """
     # Get user's active goals
-    goals_result = await session.execute(
+    goals_result = session.execute(
         select(Goal).where(Goal.user_id == user_id)
     )
     goals = goals_result.scalars().all()
 
     # Get recent checkins (last 14 days)
     week_ago = datetime.utcnow() - timedelta(days=14)
-    checkins_result = await session.execute(
+    checkins_result = session.execute(
         select(Checkin).where(
             (Checkin.user_id == user_id) & (Checkin.timestamp >= week_ago)
         ).order_by(Checkin.timestamp.desc())
@@ -70,23 +70,23 @@ async def build_goal_context(session: AsyncSession, user_id) -> dict:
     }
 
 
-async def build_mentor_context(session: AsyncSession, user_id) -> dict:
+def build_mentor_context(session: Session, user_id) -> dict:
     """
     Build comprehensive context for mentor operations.
     
     Includes operational data + recent interactions + sentiment trends.
     
     Args:
-        session: AsyncSession for database queries
+        session: Session for database queries
         user_id: ID of the mentee user
         
     Returns:
         Dictionary containing mentee's operational data, messages, and journal
     """
-    context = await build_goal_context(session, user_id)
+    context = build_goal_context(session, user_id)
     
     # Get recent messages (last 10)
-    messages_result = await session.execute(
+    messages_result = session.execute(
         select(Message)
         .where(Message.user_id == user_id)
         .order_by(Message.created_at.desc())
@@ -107,7 +107,7 @@ async def build_mentor_context(session: AsyncSession, user_id) -> dict:
     
     # Get recent journal entries
     week_ago = datetime.utcnow() - timedelta(days=7)
-    journal_result = await session.execute(
+    journal_result = session.execute(
         select(JournalEntry)
         .where(
             (JournalEntry.user_id == user_id) & 
@@ -141,18 +141,18 @@ async def build_mentor_context(session: AsyncSession, user_id) -> dict:
     return context
 
 
-async def get_goal_details_with_plan(session: AsyncSession, goal_id) -> dict:
+def get_goal_details_with_plan(session: Session, goal_id) -> dict:
     """
     Get detailed goal info including AI-generated plan, subgoals, and habits.
     
     Args:
-        session: AsyncSession
+        session: Session
         goal_id: ID of the goal
         
     Returns:
         Detailed goal structure
     """
-    goal_result = await session.execute(
+    goal_result = session.execute(
         select(Goal).where(Goal.id == goal_id)
     )
     goal = goal_result.scalar_one_or_none()
@@ -161,13 +161,13 @@ async def get_goal_details_with_plan(session: AsyncSession, goal_id) -> dict:
         return None
     
     # Get subgoals
-    subgoals_result = await session.execute(
+    subgoals_result = session.execute(
         select(Subgoal).where(Subgoal.goal_id == goal_id)
     )
     subgoals = subgoals_result.scalars().all()
     
     # Get habits
-    habits_result = await session.execute(
+    habits_result = session.execute(
         select(Habit).where(Habit.goal_id == goal_id)
     )
     habits = habits_result.scalars().all()
@@ -203,9 +203,9 @@ async def get_goal_details_with_plan(session: AsyncSession, goal_id) -> dict:
     }
 
 
-async def calculate_user_streak(session: AsyncSession, user_id) -> dict:
+def calculate_user_streak(session: Session, user_id) -> dict:
     """Calculate current streak for user."""
-    checkins_result = await session.execute(
+    checkins_result = session.execute(
         select(Checkin)
         .where(Checkin.user_id == user_id)
         .order_by(Checkin.timestamp.desc())
