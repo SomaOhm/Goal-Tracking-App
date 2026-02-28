@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import { pool } from './db/pool.js';
+import { schemaSql } from './db/schemaContent.js';
 import { authRouter } from './routes/auth.js';
 import { goalsRouter } from './routes/goals.js';
 import { checkInsRouter } from './routes/checkIns.js';
@@ -10,9 +12,14 @@ import './types.js';
 
 const app = express();
 const port = Number(process.env.PORT) || 3001;
-const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
-
-app.use(cors({ origin: corsOrigin, credentials: true }));
+// Allow multiple origins: set CORS_ORIGIN to a comma-separated list, or single value
+const corsOriginRaw = process.env.CORS_ORIGIN || 'http://localhost:5173';
+const corsOrigins = corsOriginRaw.split(',').map((o) => o.trim()).filter(Boolean);
+const corsOptions = {
+  origin: corsOrigins.length > 1 ? corsOrigins : (corsOrigins[0] || 'http://localhost:5173'),
+  credentials: true,
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 
 app.get('/', (_req, res) => {
@@ -45,6 +52,26 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
   res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(port, () => {
-  console.log(`MindBuddy API running at http://localhost:${port}`);
-});
+async function ensureSchema() {
+  const client = await pool.connect();
+  try {
+    await client.query(schemaSql);
+    console.log('Database schema ready.');
+  } catch (err) {
+    console.error('Database schema init failed:', err);
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+ensureSchema()
+  .then(() => {
+    app.listen(port, () => {
+      console.log(`MindBuddy API running at http://localhost:${port}`);
+    });
+  })
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
