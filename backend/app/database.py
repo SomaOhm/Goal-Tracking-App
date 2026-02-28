@@ -1,13 +1,19 @@
 import os
 from motor.motor_asyncio import AsyncIOMotorClient
-from dotenv import load_dotenv
+import snowflake.connector
 
-load_dotenv()
+MONGO_URI = os.getenv("MONGO_URI")
+SNOWFLAKE_CONFIG = {
+    "user": os.getenv("SNOWFLAKE_USER"),
+    "password": os.getenv("SNOWFLAKE_PASSWORD"),
+    "account": os.getenv("SNOWFLAKE_ACCOUNT"),
+    "warehouse": os.getenv("SNOWFLAKE_WAREHOUSE"),
+    "database": os.getenv("SNOWFLAKE_DATABASE"),
+    "schema": os.getenv("SNOWFLAKE_SCHEMA"),
+}
 
-client = AsyncIOMotorClient(os.getenv("MONGO_URI"))
-db = client["app_db"]
+mongo_client = AsyncIOMotorClient(MONGO_URI)
+mongo_db = mongo_client["goal_tracking"]
 
-# Async collections for FastAPI
-goals_col = db["goals"]
-checkins_col = db["checkins"]
-messages_col = db["messages"]
+def get_snowflake_connection():
+    return snowflake.connector.connect(**SNOWFLAKE_CONFIG)

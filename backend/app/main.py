@@ -1,172 +1,99 @@
-import os
-import json
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from pydantic import BaseModel
+from app.database import mongo_db, get_snowflake_connection
+from app.gemini import generate_goal_plan, review_progress, mentor_copilot
 from datetime import datetime
-import google.generativeai as genai
-from motor.motor_asyncio import AsyncIOMotorClient
-from dotenv import load_dotenv
-from bson import ObjectId
 
-# Load environment variables
-load_dotenv()
-
-app = FastAPI(title="Mentor AI Coaching Backend")
-
-# Initialize MongoDB (Async)
-client = AsyncIOMotorClient(os.getenv("MONGO_URI"))
-db = client["app_db"]
-goals_col = db["goals"]
-checkins_col = db["checkins"]
-messages_col = db["messages"]
-
-# Configure Gemini
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-# Using gemini-pro for text tasks
-model = genai.GenerativeModel('gemini-pro')
-
-# ---------------- Pydantic Models ----------------
-
-class GoalPlanRequest(BaseModel):
+app = FastAPI()
+class GoalRequest(BaseModel):
     user_id: str
-    group_theme: str
-    user_description: str
-    constraints: str
+    group_id: str
+    description: str
+    constraints: dict
 
+
+@app.post("/goals/create")
+async def create_goal(data: GoalRequest):
+    plan = await generate_goal_plan(
+        data.description,
+        data.group_id,
+        data.constraints
+    )
+
+    await mongo_db.goals.insert_one({
+        "user_id": data.user_id,
+        "group_id": data.group_id,
+        "plan": plan,
+        "created_at": datetime.utcnow()
+    })
+
+    return {"plan": plan}
 class ChatRequest(BaseModel):
     user_id: str
     group_id: str
     message: str
 
-class ReviewProgressRequest(BaseModel):
-    user_id: str
-    group_id: str
-
-# ---------------- Endpoints ----------------
-
-@app.post("/generate_goal_plan")
-async def generate_goal_plan(req: GoalPlanRequest):
-    """
-    Takes user's natural language description and group theme,
-    and uses Gemini to generate a structured JSON goal plan.
-    """
-    prompt = f"""
-    You are an expert coach for a group focused on "{req.group_theme}".
-    The user has the following goal description: "{req.user_description}".
-    Their constraints are: "{req.constraints}".
-    
-    Create a structured, achievable plan. You MUST return ONLY a valid JSON object with the following structure:
-    {{
-        "title": "Short title of the goal",
-        "category": "The category of the goal",
-        "frequency": "daily or weekly",
-        "subgoals": ["Subgoal 1", "Subgoal 2"],
-        "habits": ["Habit 1", "Habit 2"]
-    }}
-    Do not include markdown backticks like ```json.
-    """
-    
-    try:
-        response = model.generate_content(prompt)
-        plan_data = json.loads(response.text.strip())
-        
-        # Save structured plan to MongoDB
-        goal_doc = {
-            "user_id": req.user_id,
-            "group_theme": req.group_theme,
-            "title": plan_data.get("title"),
-            "category": plan_data.get("category"),
-            "frequency": plan_data.get("frequency"),
-            "subgoals": plan_data.get("subgoals", []),
-            "habits": plan_data.get("habits", []),
-            "created_at": datetime.utcnow()
-        }
-        result = await goals_col.insert_one(goal_doc)
-        goal_doc["_id"] = str(result.inserted_id)
-        
-        return {"status": "success", "plan": goal_doc}
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate plan: {str(e)}")
-
 
 @app.post("/chat")
-async def chat_with_coach(req: ChatRequest):
-    """
-    Reads context from MongoDB (goals & check-ins), calls Gemini,
-    returns the AI reply, and saves the conversation.
-    """
-    # 1. Fetch Context from MongoDB
-    user_goals = await goals_col.find({"user_id": req.user_id}).to_list(length=5)
-    recent_checkins = await checkins_col.find({"user_id": req.user_id}).sort("timestamp", -1).to_list(length=7)
-    recent_messages = await messages_col.find({"user_id": req.user_id}).sort("timestamp", -1).to_list(length=3)
-    
-    # 2. Build Context Strings
-    goals_context = "\n".join([f"- {g.get('title')} ({g.get('frequency')})" for g in user_goals])
-    checkins_context = "\n".join([f"- {c.get('timestamp')}: {'Completed' if c.get('completed') else 'Missed'}" for c in recent_checkins])
-    chat_history = "\n".join([f"User: {m.get('user_message')}\nCoach: {m.get('ai_reply')}" for m in recent_messages[::-1]])
-    
-    # 3. Construct Prompt
-    prompt = f"""
-    System: You are an encouraging group accountability coach. Use the context below to give specific, practical advice. Keep it concise.
-    
-    Active Goals:
-    {goals_context or "No active goals yet."}
-    
-    Recent Check-ins:
-    {checkins_context or "No recent check-ins."}
-    
-    Recent Chat History:
-    {chat_history or "No previous chat history."}
-    
-    User's New Message: "{req.message}"
-    """
-    
-    # 4. Call Gemini
-    try:
-        response = model.generate_content(prompt)
-        ai_reply_text = response.text.strip()
-        
-        # 5. Save to MongoDB
-        await messages_col.insert_one({
-            "user_id": req.user_id,
-            "group_id": req.group_id,
-            "user_message": req.message,
-            "ai_reply": ai_reply_text,
-            "timestamp": datetime.utcnow()
-        })
-        
-        # 6. Return to Frontend
-        return {"reply": ai_reply_text}
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI Chat failed: {str(e)}")
+async def chat(data: ChatRequest):
 
+    goals = await mongo_db.goals.find(
+        {"user_id": data.user_id}
+    ).to_list(10)
 
-@app.post("/review_progress")
-async def trigger_review_progress(req: ReviewProgressRequest):
-    """
-    Typically triggered by a Celery job/cron daily or weekly.
-    Aggregates check-ins, generates a coach message, and simulates posting to the feed.
-    """
-    recent_checkins = await checkins_col.find({"user_id": req.user_id}).sort("timestamp", -1).to_list(length=14)
-    completed = sum(1 for c in recent_checkins if c.get("completed"))
-    total = len(recent_checkins)
-    
-    prompt = f"""
-    You are an AI coach. Review the user's progress for the week.
-    Out of {total} scheduled check-ins, they completed {completed}.
-    
-    Write an engaging, public feed post to encourage them or suggest a small tweak.
-    """
-    
-    response = model.generate_content(prompt)
-    coach_post = response.text.strip()
-    
-    # In a real app, you would insert this into a `group_feed` collection here
-    
-    return {
-        "status": "success",
-        "feed_post": coach_post,
-        "metrics": {"total": total, "completed": completed}
+    checkins = await mongo_db.checkins.find(
+        {"user_id": data.user_id}
+    ).to_list(10)
+
+    context = {
+        "goals": goals,
+        "checkins": checkins
     }
+
+    ai_reply = await review_progress(str(context))
+
+    await mongo_db.messages.insert_one({
+        "user_id": data.user_id,
+        "group_id": data.group_id,
+        "message": data.message,
+        "ai_reply": ai_reply,
+        "timestamp": datetime.utcnow()
+    })
+
+    return {"reply": ai_reply}
+class MentorChat(BaseModel):
+    mentor_id: str
+    patient_id: str
+    message: str
+
+
+@app.post("/mentor/chat")
+async def mentor_chat(data: MentorChat):
+
+    user_data = await mongo_db.goals.find(
+        {"user_id": data.patient_id}
+    ).to_list(20)
+
+    conn = get_snowflake_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT * FROM mentor_dashboard
+        WHERE user_id = %s
+    """, (data.patient_id,))
+    analytics = cursor.fetchall()
+
+    context = {
+        "operational_data": user_data,
+        "analytics": analytics
+    }
+
+    ai_reply = await mentor_copilot(context, data.message)
+
+    await mongo_db.mentor_messages.insert_one({
+        "mentor_id": data.mentor_id,
+        "patient_id": data.patient_id,
+        "ai_reply": ai_reply,
+        "timestamp": datetime.utcnow()
+    })
+
+    return {"reply": ai_reply}
