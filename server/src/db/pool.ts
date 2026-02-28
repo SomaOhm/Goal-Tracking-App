@@ -8,10 +8,11 @@ if (!process.env.DATABASE_URL) {
 }
 
 const connectionString = process.env.DATABASE_URL;
-const needsSsl = /sslmode=(require|verify-full|verify-ca)/i.test(connectionString);
+const isLocalhost = /localhost|127\.0\.0\.1/i.test(connectionString);
+const sslOff = /sslmode=disable/i.test(connectionString);
 
 export const pool = new Pool({
   connectionString,
-  ssl: needsSsl ? { rejectUnauthorized: false } : undefined,
+  ssl: isLocalhost || sslOff ? undefined : { rejectUnauthorized: false },
   connectionTimeoutMillis: 15_000,
 });
