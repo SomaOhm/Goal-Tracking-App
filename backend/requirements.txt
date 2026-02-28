@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+motor           # Async MongoDB driver
+pymongo         # Sync MongoDB driver for Celery
+google-generativeai
+snowflake-connector-python
+celery
+redis
+pydantic
+python-dotenv
