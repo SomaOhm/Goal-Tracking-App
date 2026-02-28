@@ -1,45 +1,48 @@
 /**
  * Insert one user into the users table.
- * Edit EMAIL, PASSWORD, NAME below, then run: npm run db:seed-one (from server/)
+ *
+ * Usage:
+ *   npm run db:seed-one -- <email> <password> <name>
+ *
+ * Example:
+ *   npm run db:seed-one -- alice@example.com mypass123 "Alice Smith"
  */
 import 'dotenv/config';
 import bcrypt from 'bcrypt';
 import { pool } from '../src/db/pool.js';
 
-const EMAIL = 'ab@g.com';
-const PASSWORD = 'password123';
-const NAME = 'Test User';
+const [email, password, ...nameParts] = process.argv.slice(2);
+const name = nameParts.join(' ');
+
+if (!email || !password || !name) {
+  console.error('Usage: npm run db:seed-one -- <email> <password> <name>');
+  process.exit(1);
+}
 
 async function main() {
-  if (!process.env.DATABASE_URL) {
-    console.error('DATABASE_URL is not set in .env');
-    process.exit(1);
-  }
-
-  const passwordHash = await bcrypt.hash(PASSWORD, 10);
-
+  const passwordHash = await bcrypt.hash(password, 10);
   const client = await pool.connect();
   try {
     const r = await client.query(
       `INSERT INTO users (email, password_hash, name)
        VALUES ($1, $2, $3)
+       ON CONFLICT (email) DO NOTHING
        RETURNING id, email, name, created_at`,
-      [EMAIL, passwordHash, NAME]
+      [email.trim().toLowerCase(), passwordHash, name.trim()]
     );
-    const row = r.rows[0];
-    console.log('Inserted 1 user:', { id: row.id, email: row.email, name: row.name, created_at: row.created_at });
-  } catch (err: unknown) {
-    const code = (err as { code?: string })?.code;
-    if (code === '23505') {
-      console.error('User with that email already exists.');
+    if (r.rowCount === 0) {
+      console.log(`User "${email}" already exists, skipped.`);
     } else {
-      console.error(err);
+      const row = r.rows[0];
+      console.log('Created user:', { id: row.id, email: row.email, name: row.name });
     }
-    process.exit(1);
   } finally {
     client.release();
     await pool.end();
   }
 }
 
-main();
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
