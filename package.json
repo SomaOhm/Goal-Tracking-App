@@ -4,8 +4,10 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "build": "vite build",
-    "dev": "vite"
+    "dev": "vite",
+    "dev:server": "cd server && npm run dev",
+    "build": "cd server && npm install && npm run build",
+    "start": "cd server && node dist/index.js"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",
@@ -80,6 +82,9 @@
     "react-dom": {
       "optional": true
     }
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "pnpm": {
     "overrides": {
