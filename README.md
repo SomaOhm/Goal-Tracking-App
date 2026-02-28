@@ -25,15 +25,56 @@ Goal-Tracking-App
 - Analytics dashboard for all members
 - AI chatbot to discuss plans and interventions based on collected data
 
+## Running the Frontend (MindBuddy UI)
+
+This is the code bundle for the Mental Health Accountability App. The original project is available at https://www.figma.com/design/OmoKuWijoSjf4mXtmOrVWE/Mental-Health-Accountability-App.
+
+### Frontend only (demo mode)
+
+Run `npm i` to install the dependencies.
+
+Run `npm run dev` to start the development server.
+
+To use in-memory/localStorage data only, do not set `VITE_API_URL`. Sign up with any email (no password required in demo mode).
+
+### With backend (PostgreSQL on DigitalOcean)
+
+1. **Server**
+   - `cd server`
+   - Copy `.env.example` to `.env` and set `DATABASE_URL`, `JWT_SECRET` (min 32 chars), and optionally `CORS_ORIGIN` and `PORT`.
+   - Run `npm install`
+   - Run `npm run db:init` to create tables (once per database).
+   - Run `npm run dev` to start the API at http://localhost:3001.
+
+2. **Frontend**
+   - In the project root, set `VITE_API_URL=http://localhost:3001` in `.env` (or use the provided `.env`).
+   - Run `npm i` and `npm run dev`.
+
+3. **Auth**
+   - Sign up with email + password; the backend stores hashed passwords and issues a JWT. Log in with the same credentials.
+
+### Database connection timeout? (DigitalOcean)
+
+If you see **"Request timed out"** or **ETIMEDOUT** when using a DigitalOcean managed database, the DB firewall is blocking your IP. The database only accepts connections from **Trusted Sources**.
+
+1. In [DigitalOcean](https://cloud.digitalocean.com/) go to **Databases** → your cluster → **Settings**.
+2. Under **Trusted Sources**, click **Edit**.
+3. Either:
+   - **Add your current IP**: click **Add current IP address**, or  
+   - **Allow all** (for testing only): add `0.0.0.0/0`.
+4. Save. Wait a minute, then try signing up again.
+
+Your app runs on your machine, so the IP that must be allowed is the one your machine uses to reach the internet (your home/office or VPN). If you deploy the backend to a server later, add that server's IP to Trusted Sources as well.
+
 ## File structure
 
 Top-level overview of the repository (key files and folders):
 
 ```
 Goal-Tracking-App/
-├── backend/
+├── backend/                  # Python/FastAPI backend (mentor/member APIs, AI chat)
 │   ├── app/
-│   │   ├── main.py           # FastAPI (or app) entrypoints
+│   │   ├── main.py           # FastAPI entrypoints
 │   │   ├── gemini.py         # LLM / AI integration helpers
 │   │   ├── database.py       # DB connection and setup
 │   │   └── models.py         # Pydantic / ORM models
@@ -41,12 +82,17 @@ Goal-Tracking-App/
 │   │   ├── celery_app.py     # Celery configuration
 │   │   └── tasks.py          # Background tasks
 │   └── requirements.txt      # Python dependencies
-├── backend/.env              # environment variables for backend (not committed)
-├── README.md
-└── .git/
-
+├── server/                   # Node.js/Express API (auth, goals, check-ins, groups)
+├── src/                      # React/Vite frontend
+├── guidelines/               # Design guidelines
+├── index.html
+├── package.json
+├── vite.config.ts
+└── README.md
 ```
 
 Notes:
-- This shows the main backend layout; frontend or mobile client code may be in a separate folder when added.
-- Update this section as new top-level folders (e.g. `mobile/`, `frontend/`, `infra/`) are introduced.
+- `backend/` contains the Python/FastAPI services (mentor app, AI chat, analytics).
+- `server/` contains the Node.js/Express API (auth, goals, check-ins, groups).
+- `src/` contains the React frontend.
+- Update this section as new top-level folders (e.g. `mobile/`, `infra/`) are introduced.
