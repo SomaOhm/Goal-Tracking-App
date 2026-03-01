@@ -1,26 +1,31 @@
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
-const BASE = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+const API_BASE_URL = 'http://127.0.0.1:8000';
 
-export const isGeminiEnabled = () => Boolean(API_KEY);
-
-export async function askGemini(prompt: string, signal?: AbortSignal): Promise<string> {
-  if (!API_KEY) throw new Error('Gemini API key not configured');
-
-  const res = await fetch(`${BASE}?key=${API_KEY}`, {
+export async function askGemini(
+  userId: string,
+  message: string,
+  groupId?: string | null,
+  context?: string | null
+): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/chat/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    signal,
     body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
+      user_id: userId,
+      group_id: groupId ?? null,
+      message: message,
+      context: context ?? null,
     }),
   });
 
-  if (!res.ok) {
-    const err = await res.text().catch(() => '');
-    throw new Error(`Gemini error ${res.status}: ${err}`);
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    throw new Error(`Backend API error: ${response.status} - ${errorText}`);
   }
 
-  const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? 'No response generated.';
+  const data = await response.json();
+  return data.ai_reply;
+}
+
+export function isGeminiEnabled(): boolean {
+  return true;
 }

@@ -3,7 +3,7 @@ import google.generativeai as genai
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-model = genai.GenerativeModel("gemini-1.5-pro")
+model = genai.GenerativeModel("gemini-3-flash-preview")
 
 async def generate_goal_plan(user_description, group_theme, constraints):
     prompt = f"""
