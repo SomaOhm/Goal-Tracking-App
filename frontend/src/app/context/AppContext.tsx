@@ -6,6 +6,7 @@ export interface User { id: string; email: string; name: string; avatar?: string
 export interface Goal {
   id: string; userId: string; title: string; description: string;
   frequency: 'daily' | 'weekly' | 'custom'; customDays?: number[]; checklist?: string[];
+  startDate?: string; endDate?: string;
   completions: { date: string; reflection?: string }[]; visibleToGroups: string[]; createdAt: string;
 }
 export interface CheckIn { id: string; userId: string; date: string; mood: number; reflection: string; visibleToGroups: string[] }
@@ -37,12 +38,14 @@ export const useApp = () => {
 interface GoalRow {
   id: string; user_id: string; title: string; description: string;
   frequency: 'daily' | 'weekly' | 'custom'; custom_days: number[] | null; checklist: string[] | null;
+  start_date: string | null; end_date: string | null;
   created_at: string; goal_completions: { date: string; reflection: string | null }[];
   goal_visibility: { group_id: string }[];
 }
 const rowToGoal = (r: GoalRow): Goal => ({
   id: r.id, userId: r.user_id, title: r.title, description: r.description ?? '',
   frequency: r.frequency, customDays: r.custom_days ?? undefined, checklist: r.checklist ?? undefined,
+  startDate: r.start_date ?? undefined, endDate: r.end_date ?? undefined,
   completions: (r.goal_completions ?? []).map(c => ({ date: c.date, reflection: c.reflection ?? undefined })),
   visibleToGroups: (r.goal_visibility ?? []).map(v => v.group_id), createdAt: r.created_at,
 });
@@ -251,7 +254,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (supabase) {
       (async () => {
         const { data, error } = await supabase.from('goals')
-          .insert({ user_id: user.id, title: goal.title, description: goal.description, frequency: goal.frequency, custom_days: goal.customDays ?? null, checklist: goal.checklist ?? null })
+          .insert({ user_id: user.id, title: goal.title, description: goal.description, frequency: goal.frequency, custom_days: goal.customDays ?? null, checklist: goal.checklist ?? null, start_date: goal.startDate ?? null, end_date: goal.endDate ?? null })
           .select('*, goal_completions(date, reflection), goal_visibility(group_id)').single();
         if (error) { console.error('addGoal', error.message); return; }
         const ng = rowToGoal(data as GoalRow);
@@ -275,6 +278,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (updates.frequency !== undefined) db.frequency = updates.frequency;
         if (updates.customDays !== undefined) db.custom_days = updates.customDays;
         if (updates.checklist !== undefined) db.checklist = updates.checklist;
+        if (updates.startDate !== undefined) db.start_date = updates.startDate;
+        if (updates.endDate !== undefined) db.end_date = updates.endDate;
         if (Object.keys(db).length) { const { error } = await supabase.from('goals').update(db).eq('id', id); if (error) return; }
         if (updates.visibleToGroups !== undefined) {
           await supabase.from('goal_visibility').delete().eq('goal_id', id);

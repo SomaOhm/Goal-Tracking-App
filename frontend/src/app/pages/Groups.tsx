@@ -1,13 +1,14 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { Card } from '../components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
-import { Users, Plus, Copy, Check, UserPlus, Settings, Heart, Flame, Calendar, Trash2, LogOut, ChevronRight } from 'lucide-react';
+import { Users, Plus, Copy, Check, UserPlus, Settings, Heart, Flame, Calendar, Trash2, LogOut, ChevronRight, Sparkles, Loader2, Bot, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { Switch } from '../components/ui/switch';
 import { CreationAnimation } from '../components/CreationAnimation';
+import { askGemini, isGeminiEnabled } from '../lib/gemini';
 
 export const Groups: React.FC = () => {
   const { user, groups, users, goals, checkIns, createGroup, joinGroup, leaveGroup, deleteGroup, updateGoal } = useApp();
@@ -20,6 +21,69 @@ export const Groups: React.FC = () => {
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [showAnim, setShowAnim] = useState(false);
+
+  const [aiResult, setAiResult] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
+  const abortRef = useRef<AbortController | null>(null);
+
+  const toggleMemberSelect = (uid: string) => {
+    setSelectedMembers(prev => {
+      const n = new Set(prev);
+      n.has(uid) ? n.delete(uid) : n.add(uid);
+      return n;
+    });
+  };
+
+  const runGroupAnalysis = async (groupId: string) => {
+    if (aiLoading) return;
+    const gMembers = members(groupId);
+    const targets = selectedMembers.size > 0
+      ? gMembers.filter(m => selectedMembers.has(m.id))
+      : gMembers;
+
+    let ctx = `Group: "${groups.find(g => g.id === groupId)?.name}"\nMembers analyzed: ${targets.length}\nToday: ${format(new Date(), 'yyyy-MM-dd')}\n\n`;
+
+    for (const m of targets) {
+      const mg = memberGoals(m.id, groupId);
+      const mc = memberCIs(m.id, groupId);
+      ctx += `--- ${m.name} ---\n`;
+      if (mg.length === 0) { ctx += 'No shared goals.\n\n'; continue; }
+      for (const g of mg) {
+        ctx += `Goal: "${g.title}" (${g.frequency})\n`;
+        if (g.description) ctx += `  Why: ${g.description}\n`;
+        if (g.checklist?.length) ctx += `  Tasks: ${g.checklist.join(', ')}\n`;
+        ctx += `  Streak: ${streak(g)}d, Completions: ${g.completions.length}\n`;
+        const recent = g.completions.filter(c => c.reflection).slice(-3);
+        if (recent.length) ctx += `  Reflections: ${recent.map(c => `[${c.date}] "${c.reflection}"`).join('; ')}\n`;
+      }
+      if (mc.length) {
+        ctx += `  Check-ins: ${mc.map(c => `${c.date} mood:${c.mood}/5${c.reflection ? ` "${c.reflection}"` : ''}`).join('; ')}\n`;
+      }
+      ctx += '\n';
+    }
+
+    const mode = selectedMembers.size === 1
+      ? 'Give a detailed individual analysis for this person: their progress, strengths, concerns, and a personalized recommendation. A coach or therapist should find this actionable.'
+      : selectedMembers.size > 1
+        ? `Give a comparative analysis of these ${targets.length} selected members. Highlight who is thriving, who needs support, and recommend group interventions.`
+        : `Give a full group analysis. Summarize overall group health, identify members who are excelling and who may need support, spot trends, and suggest actions a coach or group leader could take.`;
+
+    const prompt = `You are MindBuddy, an AI wellness analyst for coaches and therapists. Analyze this accountability group data:\n\n${ctx}\n${mode}\n\nUse markdown. Be specific — reference names, goals, and data points.`;
+
+    setAiLoading(true);
+    setAiResult('');
+    try {
+      abortRef.current = new AbortController();
+      const reply = await askGemini(prompt, abortRef.current.signal);
+      setAiResult(reply);
+    } catch (e: any) {
+      if (e.name !== 'AbortError') setAiResult(`Error: ${e.message}`);
+    } finally {
+      setAiLoading(false);
+      abortRef.current = null;
+    }
+  };
 
   const myGroups = groups.filter(g => g.members.includes(user?.id || ''));
   const myGoals = goals.filter(g => g.userId === user?.id);
@@ -108,11 +172,11 @@ export const Groups: React.FC = () => {
           {myGroups.map(group => {
             const m = members(group.id);
             return (
-              <button key={group.id} onClick={() => { setSelected(group.id); setDetailOpen(true); }} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#FAFAFA] transition-colors text-left">
+              <button key={group.id} onClick={() => { setSelected(group.id); setDetailOpen(true); setAiResult(''); setSelectedMembers(new Set()); }} className="w-full flex items-center justify-center gap-3 px-4 py-3.5 hover:bg-[#FAFAFA] transition-colors">
                 <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#C8B3E0] to-[#A8D8EA] flex items-center justify-center shrink-0">
                   <Users className="w-4 h-4 text-white" />
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 text-center">
                   <p className="text-sm font-medium text-[#4A4A4A] truncate">{group.name}</p>
                   <p className="text-xs text-[#8A8A8A]">{m.length} member{m.length !== 1 ? 's' : ''}</p>
                 </div>
@@ -183,6 +247,57 @@ export const Groups: React.FC = () => {
                     );
                   })}
                 </div>
+
+                {isGeminiEnabled() && (
+                  <div className="border-t border-[#F0F0F0] pt-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-[#4A4A4A] flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-[#C8B3E0]" /> AI Analysis
+                      </p>
+                      {selectedMembers.size > 0 && (
+                        <button onClick={() => setSelectedMembers(new Set())} className="text-xs text-[#8A8A8A] hover:text-[#4A4A4A]">
+                          Clear selection
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs text-[#8A8A8A]">
+                      {selectedMembers.size === 0
+                        ? 'Tap members to select specific people, or analyze everyone.'
+                        : `${selectedMembers.size} member${selectedMembers.size > 1 ? 's' : ''} selected`}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {activeMembers.map(m => (
+                        <button key={m.id} onClick={() => toggleMemberSelect(m.id)}
+                          className={`px-2.5 py-1 rounded-full text-xs transition-colors ${
+                            selectedMembers.has(m.id)
+                              ? 'bg-[#C8B3E0] text-white'
+                              : 'bg-[#F5F5F5] text-[#8A8A8A] hover:bg-[#E0D5F0]'
+                          }`}>
+                          {m.name}
+                        </button>
+                      ))}
+                    </div>
+                    <Button onClick={() => runGroupAnalysis(active.id)} disabled={aiLoading}
+                      className="w-full rounded-2xl h-10 text-white text-sm"
+                      style={{ background: 'linear-gradient(135deg, #C8B3E0 0%, #A8D8EA 100%)' }}>
+                      {aiLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}
+                      {selectedMembers.size === 0 ? 'Analyze Entire Group' : selectedMembers.size === 1 ? 'Analyze Member' : `Analyze ${selectedMembers.size} Members`}
+                    </Button>
+                    {aiResult && (
+                      <div className="relative p-3 rounded-2xl bg-[#FFFBF7] border border-[#E0D5F0] text-sm text-[#4A4A4A] whitespace-pre-wrap max-h-64 overflow-y-auto">
+                        <button onClick={() => { setAiResult(''); abortRef.current?.abort(); }}
+                          className="absolute top-2 right-2 p-1 hover:bg-white rounded-lg">
+                          <X className="w-3.5 h-3.5 text-[#8A8A8A]" />
+                        </button>
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <Bot className="w-4 h-4 text-[#C8B3E0]" />
+                          <span className="text-xs font-medium text-[#8A8A8A]">MindBuddy Analysis</span>
+                        </div>
+                        {aiResult}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="flex gap-2 pt-2">
                   <Button variant="outline" onClick={() => { setDetailOpen(false); setSettingsOpen(true); }} className="flex-1 rounded-2xl h-10 text-sm border-[#E0D5F0] text-[#8A8A8A]">

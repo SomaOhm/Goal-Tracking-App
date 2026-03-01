@@ -3,6 +3,7 @@ import { Layout } from "./pages/Layout";
 import { Home } from "./pages/Home";
 import { CalendarView } from "./pages/CalendarView";
 import { Groups } from "./pages/Groups";
+import { Chat } from "./pages/Chat";
 import { Profile } from "./pages/Profile";
 
 export const router = createBrowserRouter([
@@ -13,6 +14,7 @@ export const router = createBrowserRouter([
       { index: true, Component: Home },
       { path: "calendar", Component: CalendarView },
       { path: "groups", Component: Groups },
+      { path: "chat", Component: Chat },
       { path: "profile", Component: Profile },
     ],
   },

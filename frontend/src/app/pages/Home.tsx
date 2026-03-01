@@ -2,18 +2,37 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Card } from '../components/ui/card';
 import { Progress } from '../components/ui/progress';
-import { CheckCircle2, Circle, Flame, Trash2, Calendar as CalendarIcon } from 'lucide-react';
+import { CheckCircle2, Circle, Flame, Trash2, Calendar as CalendarIcon, ChevronDown, ChevronUp, Square, CheckSquare, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Textarea } from '../components/ui/textarea';
 import { Button } from '../components/ui/button';
 
 export const Home: React.FC = () => {
-  const { user, goals, completeGoal, deleteGoal } = useApp();
+  const { user, goals, completeGoal, deleteGoal, updateGoal } = useApp();
   const [reflectionDialogOpen, setReflectionDialogOpen] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState<string | null>(null);
   const [reflection, setReflection] = useState('');
+  const [expandedGoal, setExpandedGoal] = useState<string | null>(null);
+  const [taskDone, setTaskDone] = useState<Record<string, Set<number>>>({});
   
+  const toggleTask = (goalId: string, idx: number) => {
+    setTaskDone(prev => {
+      const s = new Set(prev[goalId] ?? []);
+      s.has(idx) ? s.delete(idx) : s.add(idx);
+      return { ...prev, [goalId]: s };
+    });
+  };
+
+  const fmtDate = (d: string) => format(new Date(d + 'T00:00:00'), 'MMM d');
+
+  const timeFrameLabel = (goal: { startDate?: string; endDate?: string }) => {
+    if (goal.startDate && goal.endDate) return `${fmtDate(goal.startDate)} – ${fmtDate(goal.endDate)}`;
+    if (goal.startDate) return `From ${fmtDate(goal.startDate)}`;
+    if (goal.endDate) return `Until ${fmtDate(goal.endDate)}`;
+    return null;
+  };
+
   const today = format(new Date(), 'yyyy-MM-dd');
   const myGoals = goals.filter(g => g.userId === user?.id);
 
@@ -161,8 +180,7 @@ export const Home: React.FC = () => {
                         <p className="text-sm text-[#8A8A8A] mb-3">{goal.description}</p>
                       )}
                       
-                      {/* Metadata */}
-                      <div className="flex items-center gap-4 text-sm">
+                      <div className="flex items-center gap-3 text-sm flex-wrap">
                         <div className="flex items-center gap-1">
                           <Flame className="w-4 h-4 text-[#FFB5A0]" />
                           <span className="text-[#4A4A4A]">{streak} day{streak !== 1 ? 's' : ''}</span>
@@ -170,22 +188,44 @@ export const Home: React.FC = () => {
                         <span className="px-3 py-1 rounded-full text-xs" style={{ backgroundColor: '#FFE5A0', color: '#4A4A4A' }}>
                           {goal.frequency}
                         </span>
+                        {timeFrameLabel(goal) && (
+                          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-[#E0F4F4] text-[#4A8A8A]">
+                            <Clock className="w-3 h-3" />{timeFrameLabel(goal)}
+                          </span>
+                        )}
+                        {goal.checklist && goal.checklist.length > 0 && (
+                          <button type="button" onClick={(e) => { e.stopPropagation(); setExpandedGoal(expandedGoal === goal.id ? null : goal.id); }}
+                            className="flex items-center gap-1 text-xs text-[#C8B3E0] hover:text-[#B39DD1] transition-colors">
+                            {(taskDone[goal.id]?.size ?? 0)}/{goal.checklist.length} tasks
+                            {expandedGoal === goal.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                          </button>
+                        )}
                       </div>
                     </div>
 
-                    {/* Delete button */}
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (confirm('Delete this goal?')) {
-                          deleteGoal(goal.id);
-                        }
-                      }}
+                      onClick={(e) => { e.stopPropagation(); if (confirm('Delete this goal?')) deleteGoal(goal.id); }}
                       className="flex-shrink-0 p-2 hover:bg-red-50 rounded-xl transition-colors"
                     >
                       <Trash2 className="w-5 h-5 text-red-400" />
                     </button>
                   </div>
+
+                  {expandedGoal === goal.id && goal.checklist && goal.checklist.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-[#F0F0F0] space-y-1.5">
+                      {goal.checklist.map((task, i) => {
+                        const done = taskDone[goal.id]?.has(i);
+                        return (
+                          <button key={i} onClick={() => toggleTask(goal.id, i)} className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-[#FAFAFA] transition-colors text-left">
+                            {done
+                              ? <CheckSquare className="w-4 h-4 text-[#C8B3E0] shrink-0" />
+                              : <Square className="w-4 h-4 text-[#C8C8C8] shrink-0" />}
+                            <span className={`text-sm ${done ? 'line-through text-[#B0B0B0]' : 'text-[#4A4A4A]'}`}>{task}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </Card>
             );

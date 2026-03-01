@@ -23,6 +23,8 @@ create table if not exists public.goals (
   frequency text not null check (frequency in ('daily', 'weekly', 'custom')),
   custom_days int[],
   checklist text[],
+  start_date date,
+  end_date date,
   created_at timestamptz not null default now()
 );
 
