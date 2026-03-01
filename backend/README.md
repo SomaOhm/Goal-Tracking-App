@@ -87,14 +87,26 @@ pip install -r requirements.txt
 # Terminal 1: API Server
 uvicorn app.main:app --reload
 
-# Terminal 2: Redis
+# Terminal 2: Redis (if not already running via Homebrew)
 redis-server
 
-# Terminal 3: Celery Worker
-celery -A worker.celery_app worker --loglevel=info
+# Terminal 3: Celery Worker (run from backend/)
+PYTHONPATH=. celery -A worker.celery_app worker --loglevel=info -Q sync,reviews,celery
 
-# Terminal 4: Celery Beat (Scheduler)
-celery -A worker.celery_app beat --loglevel=info
+# Terminal 4: Celery Beat / Scheduler (run from backend/)
+PYTHONPATH=. celery -A worker.celery_app beat --loglevel=info
+```
+
+> **Note:** `PYTHONPATH=.` and `-Q sync,reviews,celery` are required. Without them the worker won't find the task modules or consume from the correct queues.
+
+### 3. Trigger a manual sync
+```bash
+# From backend/
+PYTHONPATH=. python -c "
+from worker.sync_tasks import sync_postgres_to_snowflake
+import json
+print(json.dumps(sync_postgres_to_snowflake(), indent=2, default=str))
+"
 ```
 
 ### 3. Test
@@ -288,7 +300,7 @@ Celery beat runs these tasks:
 
 | Task | Schedule | Purpose |
 |------|----------|---------|
-| `sync_all_data_to_snowflake` | Every 5 min | PostgreSQL → Snowflake |
+| `sync_all_data_to_snowflake` | Every 2 min | PostgreSQL → Snowflake |
 | `compute_adherence_scores` | Every 6 hours | Update adherence % |
 | `compute_risk_metrics` | Every 4 hours | Detect at-risk users |
 | `daily_goal_reminder` | 7 AM UTC | Daily motivation |

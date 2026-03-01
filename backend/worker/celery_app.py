@@ -7,7 +7,8 @@ from celery.schedules import crontab
 celery = Celery(
     "goal_tracking",
     broker=os.getenv("REDIS_URL", "redis://localhost:6379/0"),
-    backend=os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    backend=os.getenv("REDIS_URL", "redis://localhost:6379/0"),
+    include=["worker.sync_tasks", "worker.review_tasks"],
 )
 
 # Configure Celery
@@ -22,11 +23,10 @@ celery.conf.update(
 
 # Beat schedule for periodic tasks
 celery.conf.beat_schedule = {
-    # Data synchronization (every 5 minutes)
+    # Incremental Postgres → Snowflake sync (every 2 minutes)
     'sync-postgres-to-snowflake': {
-        'task': 'worker.sync_tasks.sync_all_data_to_snowflake',
-        'schedule': crontab(minute='*/5'),
-        'kwargs': {},
+        'task': 'worker.sync_tasks.sync_postgres_to_snowflake',
+        'schedule': 120.0,
     },
     
     # Analytics computation (every 6 hours)

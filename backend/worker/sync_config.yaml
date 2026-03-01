@@ -1,0 +1,84 @@
+# Postgres → Snowflake incremental sync configuration
+#
+# sync_interval_seconds: how often the Celery beat task fires (kept in sync
+#   with the beat schedule in celery_app.py — change both if you need to adjust)
+#
+# default_batch_size: max rows fetched per table per run
+#
+# tables[].source          : Postgres table name as it appears in Supabase
+#                            (no schema prefix — supabase-py defaults to public)
+# tables[].target          : Snowflake target table name
+# tables[].pk              : primary key column used for MERGE ON condition
+# tables[].watermark_column: column used to detect new/updated rows.
+#                            Tables without updated_at fall back to created_at,
+#                            meaning only inserts are picked up for those tables.
+# tables[].batch_size      : override default_batch_size for this table (optional)
+# tables[].enabled         : set to false to skip a table without removing config
+
+sync_interval_seconds: 120
+default_batch_size: 1000
+
+tables:
+  # --- Core user / profile data ---
+
+  - source: profiles
+    target: dim_profiles
+    pk: id
+    watermark_column: created_at   # profiles has no updated_at — insert-only
+    batch_size: 500
+    enabled: true
+
+  # --- Goals ---
+
+  - source: goals
+    target: dim_goals
+    pk: id
+    watermark_column: created_at   # goals has no updated_at visible in schema
+    batch_size: 500
+    enabled: true
+
+  - source: goal_completions
+    target: fact_goal_completions
+    pk: id
+    watermark_column: created_at
+    batch_size: 1000
+    enabled: true
+
+  - source: goal_visibility
+    target: dim_goal_visibility
+    pk: goal_id                    # composite PK — goal_id used as merge key
+    watermark_column: goal_id      # no timestamp column; full-refresh via epoch
+    batch_size: 1000
+    enabled: false                 # disabled until a timestamp column is added
+
+  # --- Check-ins ---
+
+  - source: check_ins
+    target: fact_check_ins
+    pk: id
+    watermark_column: created_at
+    batch_size: 1000
+    enabled: true
+
+  - source: check_in_visibility
+    target: dim_check_in_visibility
+    pk: check_in_id                # composite PK
+    watermark_column: check_in_id  # no timestamp column
+    batch_size: 1000
+    enabled: false                 # disabled until a timestamp column is added
+
+  # --- Groups ---
+
+  - source: groups
+    target: dim_groups
+    pk: id
+    watermark_column: created_at
+    batch_size: 500
+    enabled: true
+
+  - source: group_members
+    target: fact_group_members
+    pk: user_id                    # composite PK (group_id, user_id)
+    watermark_column: joined_at
+    batch_size: 1000
+    enabled: true
