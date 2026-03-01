@@ -54,7 +54,7 @@ def coach_group_analysis(body: GroupAnalysisBody):
     """Generate encouraging analysis for a group (or subgroup) from pre-built context."""
     if not settings.GEMINI_API_KEY:
         raise HTTPException(status_code=503, detail="GEMINI_API_KEY not configured")
-    prompt = f"""You are MindBuddy, a supportive group accountability coach and wellness analyst. Based on the following context about one or more members' goals and check-ins, provide an encouraging analysis. If the context includes an "Instruction:" line, follow it (e.g. full group summary, comparative analysis, or individual analysis). Otherwise highlight progress, wins, and one or two gentle suggestions. Use markdown. Be specific — reference names, goals, and data points. Keep it positive and actionable.
+    prompt = f"""You are Flock, a supportive group accountability coach and wellness analyst. Based on the following context about one or more members' goals and check-ins, provide an encouraging analysis. If the context includes an "Instruction:" line, follow it (e.g. full group summary, comparative analysis, or individual analysis). Otherwise highlight progress, wins, and one or two gentle suggestions. Use markdown. Be specific — reference names, goals, and data points. Keep it positive and actionable.
 
 Context:
 {body.context}

@@ -4,10 +4,11 @@ import { Card } from '../components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
-import { Users, Plus, Copy, Check, UserPlus, Settings, Heart, Flame, Calendar, Trash2, LogOut, ChevronRight, Sparkles, Loader2, Bot, X } from 'lucide-react';
+import { Users, Plus, Copy, Check, UserPlus, Settings, Heart, Calendar, Trash2, LogOut, ChevronRight, Sparkles, Loader2, Bot, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { Switch } from '../components/ui/switch';
 import { CreationAnimation } from '../components/CreationAnimation';
+import ReactMarkdown from 'react-markdown';
 import { askGemini, isGeminiEnabled, getBackendUrl, coachGroupAnalysisBackend } from '../lib/gemini';
 
 export const Groups: React.FC = () => {
@@ -69,7 +70,7 @@ export const Groups: React.FC = () => {
         ? `Give a comparative analysis of these ${targets.length} selected members. Highlight who is thriving, who needs support, and recommend group interventions.`
         : `Give a full group analysis. Summarize overall group health, identify members who are excelling and who may need support, spot trends, and suggest actions a coach or group leader could take.`;
 
-    const prompt = `You are MindBuddy, an AI wellness analyst for coaches and therapists. Analyze this accountability group data:\n\n${ctx}\n${mode}\n\nUse markdown. Be specific — reference names, goals, and data points.`;
+    const prompt = `You are Flock, an AI wellness analyst for coaches and therapists. Analyze this accountability group data:\n\n${ctx}\n${mode}\n\nUse markdown. Be specific — reference names, goals, and data points.`;
     const contextForBackend = `${ctx}\nInstruction: ${mode}`;
 
     setAiLoading(true);
@@ -144,7 +145,7 @@ export const Groups: React.FC = () => {
   const activeMembers = selected ? members(selected) : [];
 
   return (
-    <div className="pb-28 px-4 pt-6 max-w-md mx-auto">
+    <div className="pb-28 pt-6 w-full">
       {showAnim && <CreationAnimation variant="group" onComplete={onAnimDone} />}
 
       <div className="mb-6 flex items-center justify-between">
@@ -153,10 +154,10 @@ export const Groups: React.FC = () => {
           <p className="text-[#8A8A8A]">Share your journey with friends</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setJoinOpen(true)} className="p-3 rounded-2xl bg-[#A8D8EA] hover:bg-[#7FC4DA] transition-colors">
+          <button type="button" onClick={() => setJoinOpen(true)} className="cursor-pointer p-3 rounded-2xl bg-[#A8D8EA] hover:bg-[#7FC4DA] transition-colors">
             <UserPlus className="w-5 h-5 text-white" />
           </button>
-          <button onClick={() => setCreateOpen(true)} className="p-3 rounded-2xl bg-[#C8B3E0] hover:bg-[#B39DD1] transition-colors">
+          <button type="button" onClick={() => setCreateOpen(true)} className="cursor-pointer p-3 rounded-2xl bg-[#C8B3E0] hover:bg-[#B39DD1] transition-colors">
             <Plus className="w-5 h-5 text-white" />
           </button>
         </div>
@@ -175,7 +176,7 @@ export const Groups: React.FC = () => {
           {myGroups.map(group => {
             const m = members(group.id);
             return (
-              <button key={group.id} onClick={() => { setSelected(group.id); setDetailOpen(true); setAiResult(''); setSelectedMembers(new Set()); }} className="w-full flex items-center justify-center gap-3 px-4 py-3.5 hover:bg-[#FAFAFA] transition-colors">
+              <button key={group.id} type="button" onClick={() => { setSelected(group.id); setDetailOpen(true); setAiResult(''); setSelectedMembers(new Set()); }} className="cursor-pointer w-full flex items-center justify-center gap-3 px-4 py-3.5 hover:bg-[#FAFAFA] transition-colors">
                 <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#C8B3E0] to-[#A8D8EA] flex items-center justify-center shrink-0">
                   <Users className="w-4 h-4 text-white" />
                 </div>
@@ -191,27 +192,27 @@ export const Groups: React.FC = () => {
       )}
 
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="rounded-3xl max-w-md mx-4 bg-white max-h-[85vh] overflow-y-auto">
+        <DialogContent className="rounded-3xl !w-[98vw] !max-w-[1800px] sm:!max-w-[1800px] mx-auto bg-white max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
           {active && (
-            <>
-              <DialogHeader><DialogTitle className="text-2xl text-[#4A4A4A]">{active.name}</DialogTitle></DialogHeader>
-              <div className="space-y-4 mt-4">
-                <div className="p-3 rounded-2xl bg-[#FFFBF7] flex items-center justify-between">
+            <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-hidden">
+              {/* Left: People */}
+              <div className="flex flex-col md:w-[42%] md:max-w-md min-w-0 border-b md:border-b-0 md:border-r border-[#F0F0F0] overflow-y-auto p-6">
+                <DialogHeader className="p-0 mb-4"><DialogTitle className="text-2xl text-[#4A4A4A]">{active.name}</DialogTitle></DialogHeader>
+                <div className="p-3 rounded-2xl bg-[#FFFBF7] flex items-center justify-between mb-4">
                   <div>
                     <p className="text-xs text-[#8A8A8A] mb-0.5">Invite Code</p>
-                    <p className="text-[#4A4A4A] font-mono text-sm">{active.inviteCode}</p>
+                    <p className="text-base text-[#4A4A4A] font-mono">{active.inviteCode}</p>
                   </div>
-                  <button onClick={() => copyCode(active.inviteCode)} className="p-2 hover:bg-white rounded-xl transition-colors">
-                    {copiedCode === active.inviteCode ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4 text-[#C8B3E0]" />}
+                  <button type="button" onClick={() => copyCode(active.inviteCode)} className="cursor-pointer p-2 hover:bg-white rounded-xl transition-colors">
+                    {copiedCode === active.inviteCode ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5 text-[#C8B3E0]" />}
                   </button>
                 </div>
-
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => { setDetailOpen(false); setSettingsOpen(true); }} className="flex-1 rounded-2xl h-10 text-sm border-[#E0D5F0] text-[#8A8A8A]">
-                    <Settings className="w-4 h-4 mr-1" /> Settings & goal visibility
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <Button variant="outline" onClick={() => { setDetailOpen(false); setSettingsOpen(true); }} className="rounded-2xl h-10 text-sm border-[#E0D5F0] text-[#8A8A8A]">
+                    <Settings className="w-4 h-4 mr-1" /> Settings
                   </Button>
                   {active.createdBy === user?.id ? (
-                    <Button variant="outline" onClick={() => { if (confirm('Delete this group? All members will be removed.')) { deleteGroup(active.id); setDetailOpen(false); setSelected(null); } }} className="rounded-2xl h-10 text-sm border-red-200 text-red-500 hover:bg-red-50">
+                    <Button variant="outline" onClick={() => { if (confirm('Delete this group?')) { deleteGroup(active.id); setDetailOpen(false); setSelected(null); } }} className="rounded-2xl h-10 text-sm border-red-200 text-red-500 hover:bg-red-50">
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   ) : (
@@ -220,138 +221,130 @@ export const Groups: React.FC = () => {
                     </Button>
                   )}
                 </div>
-
+                <p className="text-sm font-medium text-[#4A4A4A] mb-2">Members</p>
                 <div className="space-y-3">
                   {activeMembers.map(member => {
                     const mg = memberGoals(member.id, active.id);
-                    const mc = memberCIs(member.id, active.id);
                     const isMe = member.id === user?.id;
                     return (
-                      <div key={member.id} className="p-3 rounded-2xl" style={{ backgroundColor: isMe ? '#FFD4C8' : '#F5F5F5' }}>
+                      <div key={member.id} className="p-4 rounded-2xl min-w-0" style={{ backgroundColor: isMe ? '#FFD4C8' : '#F5F5F5' }}>
                         <div className="flex items-center gap-3 mb-2">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#C8B3E0] to-[#FFB5A0] flex items-center justify-center text-white text-sm">
+                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#C8B3E0] to-[#FFB5A0] flex items-center justify-center text-white text-sm shrink-0">
                             {member.name.charAt(0).toUpperCase()}
                           </div>
-                          <h4 className="text-sm text-[#4A4A4A]">{member.name}{isMe ? ' (You)' : ''}</h4>
+                          <h4 className="text-sm font-medium text-[#4A4A4A] truncate">{member.name}{isMe ? ' (You)' : ''}</h4>
                         </div>
-                        {mg.length > 0 && (
-                          <div className="mb-2">
+                        {mg.length > 0 ? (
+                          <div>
                             <p className="text-xs text-[#8A8A8A] mb-1 flex items-center gap-1"><Calendar className="w-3 h-3" /> Goals</p>
                             {mg.map(g => (
-                              <div key={g.id} className="flex items-center gap-2 text-xs ml-1">
-                                <Flame className="w-3 h-3 text-[#FFB5A0]" />
-                                <span className="text-[#4A4A4A]">{g.title}</span>
-                                <span className="text-[#8A8A8A]">({streak(g)}d streak)</span>
+                              <div key={g.id} className="flex items-center gap-2 text-xs ml-1 flex-wrap">
+                                <span className="text-[#4A4A4A] break-words">{g.title}</span>
+                                <span className="text-[#8A8A8A] shrink-0">({streak(g)}d streak)</span>
                               </div>
                             ))}
                           </div>
-                        )}
-                        {mc.length > 0 && (
-                          <div>
-                            <p className="text-xs text-[#8A8A8A] mb-1 flex items-center gap-1"><Heart className="w-3 h-3" /> Recent</p>
-                            {mc.map(ci => (
-                              <div key={ci.id} className="flex items-center gap-2 text-xs ml-1 mb-0.5">
-                                <span>{moodEmoji(ci.mood)}</span>
-                                <span className="text-[#8A8A8A]">{format(new Date(ci.date), 'MMM d')}</span>
-                                {ci.reflection && <span className="text-[#8A8A8A] italic truncate">— {ci.reflection}</span>}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {mg.length === 0 && mc.length === 0 && (
-                          <p className="text-xs text-[#8A8A8A] italic ml-1">{isMe ? 'Share goals via settings' : 'No shared activity yet'}</p>
+                        ) : (
+                          <p className="text-xs text-[#8A8A8A] italic ml-1">{isMe ? 'Share goals via settings' : 'No shared goals yet'}</p>
                         )}
                       </div>
                     );
                   })}
                 </div>
+              </div>
 
-                {isGeminiEnabled() && (
-                  <div className="border-t border-[#F0F0F0] pt-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-[#4A4A4A] flex items-center gap-1.5">
-                        <Sparkles className="w-4 h-4 text-[#C8B3E0]" /> AI Analysis
-                      </p>
-                      {selectedMembers.size > 0 && (
-                        <button onClick={() => setSelectedMembers(new Set())} className="text-xs text-[#8A8A8A] hover:text-[#4A4A4A]">
-                          Clear selection
-                        </button>
-                      )}
-                    </div>
-                    <p className="text-xs text-[#8A8A8A]">
-                      {selectedMembers.size === 0
-                        ? 'Tap members to select specific people, or analyze everyone.'
-                        : `${selectedMembers.size} member${selectedMembers.size > 1 ? 's' : ''} selected`}
+              {/* Right: Chat (AI Analysis) */}
+              {isGeminiEnabled() ? (
+                <div className="flex flex-col flex-1 min-w-0 bg-[#FFFBF7] overflow-hidden">
+                  <div className="p-4 border-b border-[#E0D5F0] shrink-0">
+                    <p className="text-sm font-medium text-[#4A4A4A] flex items-center gap-2 mb-2">
+                      <Sparkles className="w-4 h-4 text-[#C8B3E0]" /> Flock Analysis
                     </p>
-                    <div className="flex flex-wrap gap-1.5">
+                    <p className="text-xs text-[#8A8A8A] mb-2">
+                      {selectedMembers.size === 0 ? 'Analyze everyone, or tap members on the left to analyze specific people.' : `${selectedMembers.size} selected — tap on left to change.`}
+                    </p>
+                    <div className="flex flex-wrap gap-2 mb-2">
                       {activeMembers.map(m => (
-                        <button key={m.id} onClick={() => toggleMemberSelect(m.id)}
-                          className={`px-2.5 py-1 rounded-full text-xs transition-colors ${
-                            selectedMembers.has(m.id)
-                              ? 'bg-[#C8B3E0] text-white'
-                              : 'bg-[#F5F5F5] text-[#8A8A8A] hover:bg-[#E0D5F0]'
+                        <button key={m.id} type="button" onClick={() => toggleMemberSelect(m.id)}
+                          className={`cursor-pointer px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                            selectedMembers.has(m.id) ? 'bg-[#C8B3E0] text-white' : 'bg-white border border-[#E0D5F0] text-[#8A8A8A] hover:bg-[#E0D5F0]'
                           }`}>
                           {m.name}
                         </button>
                       ))}
                     </div>
                     <Button onClick={() => runGroupAnalysis(active.id)} disabled={aiLoading}
-                      className="w-full rounded-2xl h-10 text-white text-sm"
+                      className="w-full rounded-2xl h-10 text-sm text-white"
                       style={{ background: 'linear-gradient(135deg, #C8B3E0 0%, #A8D8EA 100%)' }}>
                       {aiLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}
-                      {selectedMembers.size === 0 ? 'Analyze Entire Group' : selectedMembers.size === 1 ? 'Analyze Member' : `Analyze ${selectedMembers.size} Members`}
+                      {aiLoading ? 'Analyzing…' : selectedMembers.size === 0 ? 'Analyze entire group' : `Analyze ${selectedMembers.size} selected`}
                     </Button>
-                    {aiResult && (
-                      <div className="relative p-3 rounded-2xl bg-[#FFFBF7] border border-[#E0D5F0] text-sm text-[#4A4A4A] whitespace-pre-wrap max-h-64 overflow-y-auto">
-                        <button onClick={() => { setAiResult(''); abortRef.current?.abort(); }}
-                          className="absolute top-2 right-2 p-1 hover:bg-white rounded-lg">
-                          <X className="w-3.5 h-3.5 text-[#8A8A8A]" />
-                        </button>
-                        <div className="flex items-center gap-1.5 mb-2">
-                          <Bot className="w-4 h-4 text-[#C8B3E0]" />
-                          <span className="text-xs font-medium text-[#8A8A8A]">MindBuddy Analysis</span>
-                        </div>
-                        {aiResult}
+                  </div>
+                  <div className="flex-1 min-h-0 overflow-y-auto p-4">
+                    {aiLoading && !aiResult ? (
+                      <div className="flex flex-col items-center justify-center py-12 gap-3">
+                        <Loader2 className="w-8 h-8 text-[#C8B3E0] animate-spin" />
+                        <p className="text-sm text-[#8A8A8A]">Analyzing group…</p>
                       </div>
+                    ) : aiResult ? (
+                      <div className="prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 text-[#4A4A4A]">
+                        <ReactMarkdown
+                          components={{
+                            p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                            ul: ({ children }) => <ul className="list-disc pl-4 my-2 space-y-0.5">{children}</ul>,
+                            ol: ({ children }) => <ol className="list-decimal pl-4 my-2 space-y-0.5">{children}</ol>,
+                            li: ({ children }) => <li className="leading-snug">{children}</li>,
+                            strong: ({ children }) => <strong className="font-semibold text-[#3A3A3A]">{children}</strong>,
+                          }}
+                        >
+                          {aiResult}
+                        </ReactMarkdown>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-[#8A8A8A]">Run analysis to see results here.</p>
                     )}
                   </div>
-                )}
-              </div>
-            </>
+                </div>
+              ) : (
+                <div className="flex-1 min-w-0 flex items-center justify-center p-8 bg-[#FFFBF7]">
+                  <p className="text-sm text-[#8A8A8A]">Enable AI in settings to see group analysis here.</p>
+                </div>
+              )}
+            </div>
           )}
         </DialogContent>
       </Dialog>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="rounded-3xl max-w-md mx-4 bg-white">
-          <DialogHeader><DialogTitle className="text-2xl text-[#4A4A4A]">Create Group</DialogTitle></DialogHeader>
-          <div className="space-y-4 mt-4">
+        <DialogContent className="rounded-3xl w-[92vw] max-w-xl mx-auto bg-white p-8">
+          <DialogHeader><DialogTitle className="text-3xl text-[#4A4A4A]">Create Group</DialogTitle></DialogHeader>
+          <div className="space-y-5 mt-6">
             <div>
               <label className="block mb-2 text-[#4A4A4A]">Group Name</label>
-              <Input value={groupName} onChange={e => setGroupName(e.target.value)} placeholder="E.g., Mental Health Warriors" className="rounded-2xl border-[#E0D5F0] focus:border-[#C8B3E0] bg-[#FFFBF7]" />
+              <Input value={groupName} onChange={e => setGroupName(e.target.value)} placeholder="E.g., Mental Health Warriors" className="rounded-2xl border-[#E0D5F0] focus:border-[#C8B3E0] bg-[#FFFBF7] h-12 text-base" />
             </div>
-            <Button onClick={handleCreate} className="w-full rounded-2xl h-12 text-white" style={{ background: 'linear-gradient(135deg, #C8B3E0 0%, #B39DD1 100%)' }}>Create Group</Button>
+            <Button onClick={handleCreate} className="w-full rounded-2xl h-14 text-base text-white" style={{ background: 'linear-gradient(135deg, #C8B3E0 0%, #B39DD1 100%)' }}>Create Group</Button>
           </div>
         </DialogContent>
       </Dialog>
 
       <Dialog open={joinOpen} onOpenChange={setJoinOpen}>
-        <DialogContent className="rounded-3xl max-w-md mx-4 bg-white">
-          <DialogHeader><DialogTitle className="text-2xl text-[#4A4A4A]">Join Group</DialogTitle></DialogHeader>
-          <div className="space-y-4 mt-4">
+        <DialogContent className="rounded-3xl w-[92vw] max-w-xl mx-auto bg-white p-8">
+          <DialogHeader><DialogTitle className="text-3xl text-[#4A4A4A]">Join Group</DialogTitle></DialogHeader>
+          <div className="space-y-5 mt-6">
             <div>
               <label className="block mb-2 text-[#4A4A4A]">Invite Code</label>
-              <Input value={inviteCode} onChange={e => setInviteCode(e.target.value.toUpperCase())} placeholder="Enter 6-digit code" className="rounded-2xl border-[#E0D5F0] focus:border-[#C8B3E0] bg-[#FFFBF7] uppercase" maxLength={6} />
+              <Input value={inviteCode} onChange={e => setInviteCode(e.target.value.toUpperCase())} placeholder="Enter 6-digit code" className="rounded-2xl border-[#E0D5F0] focus:border-[#C8B3E0] bg-[#FFFBF7] uppercase h-12 text-base" maxLength={6} />
             </div>
-            <Button onClick={handleJoin} className="w-full rounded-2xl h-12 text-white" style={{ background: 'linear-gradient(135deg, #A8D8EA 0%, #7FC4DA 100%)' }}>Join Group</Button>
+            <Button onClick={handleJoin} className="w-full rounded-2xl h-14 text-base text-white" style={{ background: 'linear-gradient(135deg, #A8D8EA 0%, #7FC4DA 100%)' }}>Join Group</Button>
           </div>
         </DialogContent>
       </Dialog>
 
       <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-        <DialogContent className="rounded-3xl max-w-md mx-4 bg-white">
-          <DialogHeader><DialogTitle className="text-2xl text-[#4A4A4A]">Group Settings</DialogTitle></DialogHeader>
-          <div className="space-y-4 mt-4">
+        <DialogContent className="rounded-3xl w-[92vw] max-w-xl mx-auto bg-white p-8 max-h-[88vh] overflow-y-auto">
+          <DialogHeader><DialogTitle className="text-3xl text-[#4A4A4A]">Group Settings</DialogTitle></DialogHeader>
+          <div className="space-y-5 mt-6">
             <p className="text-sm text-[#8A8A8A] font-medium">Goal Visibility</p>
             <p className="text-xs text-[#8A8A8A]">Choose which goals are visible to this group</p>
             {myGoals.length === 0 ? (

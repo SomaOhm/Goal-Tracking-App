@@ -6,15 +6,16 @@ import snowflake.connector
 import os
 
 # Supabase PostgreSQL connection (synchronous engine)
-# Supabase provides a PostgreSQL database that works with SQLAlchemy
 DATABASE_URL = settings.DATABASE_URL
 
+# Short timeout so startup doesn't hang on slow/unreachable DB
 engine = create_engine(
     DATABASE_URL,
     echo=False,
-    pool_pre_ping=True,  # Verify connection before using
+    pool_pre_ping=True,
     pool_size=5,
-    max_overflow=10
+    max_overflow=10,
+    connect_args={"connect_timeout": 15},
 )
 
 SessionLocal = sessionmaker(

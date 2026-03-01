@@ -48,7 +48,7 @@ export const CalendarView: React.FC = () => {
   const selectedDateGoals = getGoalsForDate(selectedDate);
 
   return (
-    <div className="pb-28 px-4 pt-6 max-w-md mx-auto">
+    <div className="pb-28 pt-6 w-full">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-3xl mb-2 text-[#4A4A4A]">Calendar</h1>

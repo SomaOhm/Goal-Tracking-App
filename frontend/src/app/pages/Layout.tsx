@@ -26,8 +26,10 @@ export const Layout: React.FC = () => {
   if (!user) return <Login />;
 
   return (
-    <div className="min-h-screen">
-      <Outlet />
+    <div className="min-h-screen bg-[#FFFBF7]">
+      <main className="w-full max-w-6xl mx-auto px-4 sm:px-6 min-h-[calc(100vh-5rem)]">
+        <Outlet />
+      </main>
       <BottomNav />
       <FAB />
       <WelcomeDialog open={showWelcome} onClose={closeWelcome} />

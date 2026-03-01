@@ -30,15 +30,17 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 
 
-# Create tables on startup
+# Create tables in background so server becomes ready immediately
 @app.on_event("startup")
 def startup():
-    """Create database tables on application startup."""
-    try:
-        Base.metadata.create_all(bind=engine)
-    except Exception as e:
-        print(f"Warning: Could not create database tables: {e}")
-        print("API will run without database. Update DATABASE_URL in .env to connect to a real database.")
+    """Create database tables in a background thread so startup is fast."""
+    import threading
+    def _create_tables():
+        try:
+            Base.metadata.create_all(bind=engine)
+        except Exception as e:
+            print(f"Warning: Database unreachable ({type(e).__name__}). API will run; use Supabase REST for data.")
+    threading.Thread(target=_create_tables, daemon=True).start()
 
 
 

@@ -1,15 +1,23 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Card } from '../components/ui/card';
 import { Progress } from '../components/ui/progress';
-import { CheckCircle2, Circle, Flame, Trash2, Calendar as CalendarIcon, ChevronDown, ChevronUp, Square, CheckSquare, Clock } from 'lucide-react';
-import { format } from 'date-fns';
+import { CheckCircle2, Circle, Trash2, Calendar as CalendarIcon, ChevronDown, ChevronUp, Square, CheckSquare, Clock, TrendingUp, Smile } from 'lucide-react';
+import { format, subWeeks, startOfWeek, subDays } from 'date-fns';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  LineChart, Line,
+} from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '../components/ui/chart';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Textarea } from '../components/ui/textarea';
 import { Button } from '../components/ui/button';
 
 export const Home: React.FC = () => {
-  const { user, goals, completeGoal, deleteGoal, updateGoal } = useApp();
+  const { user, goals, checkIns, completeGoal, deleteGoal, updateGoal } = useApp();
+  type ChartRange = 'week' | 'twoWeeks' | 'month';
+  const [completionsRange, setCompletionsRange] = useState<ChartRange>('twoWeeks');
+  const [moodRange, setMoodRange] = useState<ChartRange>('twoWeeks');
   const [reflectionDialogOpen, setReflectionDialogOpen] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState<string | null>(null);
   const [reflection, setReflection] = useState('');
@@ -35,6 +43,46 @@ export const Home: React.FC = () => {
 
   const today = format(new Date(), 'yyyy-MM-dd');
   const myGoals = goals.filter(g => g.userId === user?.id);
+  const myCheckIns = checkIns.filter(c => c.userId === user?.id);
+
+  const weekCount = completionsRange === 'week' ? 1 : completionsRange === 'twoWeeks' ? 2 : 4;
+  const dayCount = moodRange === 'week' ? 7 : moodRange === 'twoWeeks' ? 14 : 30;
+
+  const weeklyCompletionsData = useMemo(() => {
+    const weekStart = (d: Date) => startOfWeek(d, { weekStartsOn: 0 });
+    const weeks: { week: string; completions: number }[] = [];
+    for (let i = weekCount - 1; i >= 0; i--) {
+      const w = subWeeks(new Date(), i);
+      const key = format(weekStart(w), 'MMM d');
+      weeks.push({ week: key, completions: 0 });
+    }
+    const keyToIdx = Object.fromEntries(weeks.map((w, i) => [w.week, i]));
+    const cutoff = subWeeks(new Date(), weekCount);
+    for (const goal of myGoals) {
+      for (const c of goal.completions) {
+        const d = new Date(c.date + 'T00:00:00');
+        if (d >= cutoff) {
+          const key = format(weekStart(d), 'MMM d');
+          const idx = keyToIdx[key];
+          if (idx !== undefined) weeks[idx].completions++;
+        }
+      }
+    }
+    return weeks;
+  }, [myGoals, weekCount]);
+
+  const moodData = useMemo(() => {
+    return Array.from({ length: dayCount }, (_, i) => {
+      const d = subDays(new Date(), dayCount - 1 - i);
+      const key = format(d, 'yyyy-MM-dd');
+      const ci = myCheckIns.find(c => c.date === key);
+      return {
+        date: format(d, dayCount <= 14 ? 'MMM d' : 'M/d'),
+        mood: ci?.mood ?? null,
+        fullDate: key,
+      };
+    });
+  }, [myCheckIns, dayCount]);
 
   const calculateStreak = (goal: typeof goals[0]) => {
     if (goal.completions.length === 0) return 0;
@@ -92,7 +140,7 @@ export const Home: React.FC = () => {
       import('sonner').then(({ toast }) => {
         const messages = [
           '🎉 Amazing work!',
-          '✨ You\'re on fire!',
+          '✨ Nice one!',
           '💪 Keep it up!',
           '🌟 Proud of you!',
           '🎯 Goal crushed!',
@@ -103,7 +151,7 @@ export const Home: React.FC = () => {
   };
 
   return (
-    <div className="pb-28 px-4 pt-6 max-w-md mx-auto">
+    <div className="pb-28 pt-6 w-full">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-3xl mb-2 text-[#4A4A4A]">Hello, {user?.name}! 👋</h1>
@@ -124,6 +172,77 @@ export const Home: React.FC = () => {
           {getTodayProgress() === 100 ? '🎉 All goals completed!' : 'Keep going!'}
         </p>
       </Card>
+
+      {/* Charts side by side */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        {/* Weekly Completions */}
+        <Card className="p-6 rounded-3xl shadow-md border-none bg-white flex flex-col min-w-0">
+          <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-[#C8B3E0]" />
+              <h3 className="text-lg text-[#4A4A4A]">Completions</h3>
+            </div>
+            <div className="flex gap-1.5">
+              {(['week', 'twoWeeks', 'month'] as const).map((range) => (
+                <button
+                  key={range}
+                  type="button"
+                  onClick={() => setCompletionsRange(range)}
+                  className={`cursor-pointer px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                    completionsRange === range ? 'text-white' : 'text-[#4A4A4A] bg-[#F5F5F5] hover:bg-[#EEE]'
+                  }`}
+                  style={completionsRange === range ? { background: 'linear-gradient(135deg, #C8B3E0 0%, #B39DD1 100%)' } : undefined}
+                >
+                  {range === 'week' ? 'Week' : range === 'twoWeeks' ? '2 wks' : 'Month'}
+                </button>
+              ))}
+            </div>
+          </div>
+          <ChartContainer config={{ completions: { label: 'Completions', color: '#C8B3E0' } }} className="h-[180px] w-full min-h-0">
+            <BarChart data={weeklyCompletionsData} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#F0F0F0" />
+              <XAxis dataKey="week" tick={{ fill: '#8A8A8A', fontSize: 10 }} />
+              <YAxis tick={{ fill: '#8A8A8A', fontSize: 10 }} allowDecimals={false} width={24} />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <Bar dataKey="completions" fill="#C8B3E0" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ChartContainer>
+        </Card>
+
+        {/* Mood Over Time */}
+        <Card className="p-6 rounded-3xl shadow-md border-none bg-white flex flex-col min-w-0">
+          <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Smile className="w-5 h-5 text-[#FFB5A0]" />
+              <h3 className="text-lg text-[#4A4A4A]">Mood</h3>
+            </div>
+            <div className="flex gap-1.5">
+              {(['week', 'twoWeeks', 'month'] as const).map((range) => (
+                <button
+                  key={range}
+                  type="button"
+                  onClick={() => setMoodRange(range)}
+                  className={`cursor-pointer px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                    moodRange === range ? 'text-white' : 'text-[#4A4A4A] bg-[#F5F5F5] hover:bg-[#EEE]'
+                  }`}
+                  style={moodRange === range ? { background: 'linear-gradient(135deg, #FFB5A0 0%, #E09A85 100%)' } : undefined}
+                >
+                  {range === 'week' ? 'Week' : range === 'twoWeeks' ? '2 wks' : 'Month'}
+                </button>
+              ))}
+            </div>
+          </div>
+          <ChartContainer config={{ mood: { label: 'Mood', color: '#FFB5A0' } }} className="h-[180px] w-full min-h-0">
+            <LineChart data={moodData} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#F0F0F0" />
+              <XAxis dataKey="date" tick={{ fill: '#8A8A8A', fontSize: 10 }} />
+              <YAxis domain={[1, 5]} ticks={[1, 2, 3, 4, 5]} tick={{ fill: '#8A8A8A', fontSize: 10 }} width={20} />
+              <ChartTooltip content={<ChartTooltipContent formatter={(v) => [v != null ? `${v}/5` : '—', 'Mood']} />} />
+              <Line type="monotone" dataKey="mood" stroke="#FFB5A0" strokeWidth={2} dot={{ fill: '#FFB5A0', r: 3 }} connectNulls />
+            </LineChart>
+          </ChartContainer>
+        </Card>
+      </div>
 
       {/* Goals List */}
       <div className="space-y-4">
@@ -161,8 +280,9 @@ export const Home: React.FC = () => {
                   <div className="flex items-start gap-4">
                     {/* Checkbox */}
                     <button
+                      type="button"
                       onClick={() => handleGoalClick(goal.id)}
-                      className="mt-1 flex-shrink-0"
+                      className="cursor-pointer mt-1 flex-shrink-0"
                     >
                       {completed ? (
                         <CheckCircle2 className="w-8 h-8 text-[#C8B3E0] fill-[#C8B3E0]/20" />
@@ -181,10 +301,7 @@ export const Home: React.FC = () => {
                       )}
                       
                       <div className="flex items-center gap-3 text-sm flex-wrap">
-                        <div className="flex items-center gap-1">
-                          <Flame className="w-4 h-4 text-[#FFB5A0]" />
-                          <span className="text-[#4A4A4A]">{streak} day{streak !== 1 ? 's' : ''}</span>
-                        </div>
+                        <span className="text-[#4A4A4A]">{streak} day{streak !== 1 ? 's' : ''} streak</span>
                         <span className="px-3 py-1 rounded-full text-xs" style={{ backgroundColor: '#FFE5A0', color: '#4A4A4A' }}>
                           {goal.frequency}
                         </span>
@@ -195,7 +312,7 @@ export const Home: React.FC = () => {
                         )}
                         {goal.checklist && goal.checklist.length > 0 && (
                           <button type="button" onClick={(e) => { e.stopPropagation(); setExpandedGoal(expandedGoal === goal.id ? null : goal.id); }}
-                            className="flex items-center gap-1 text-xs text-[#C8B3E0] hover:text-[#B39DD1] transition-colors">
+                            className="cursor-pointer flex items-center gap-1 text-xs text-[#C8B3E0] hover:text-[#B39DD1] transition-colors">
                             {(taskDone[goal.id]?.size ?? 0)}/{goal.checklist.length} tasks
                             {expandedGoal === goal.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                           </button>
@@ -204,8 +321,9 @@ export const Home: React.FC = () => {
                     </div>
 
                     <button
+                      type="button"
                       onClick={(e) => { e.stopPropagation(); if (confirm('Delete this goal?')) deleteGoal(goal.id); }}
-                      className="flex-shrink-0 p-2 hover:bg-red-50 rounded-xl transition-colors"
+                      className="cursor-pointer flex-shrink-0 p-2 hover:bg-red-50 rounded-xl transition-colors"
                     >
                       <Trash2 className="w-5 h-5 text-red-400" />
                     </button>
@@ -216,7 +334,7 @@ export const Home: React.FC = () => {
                       {goal.checklist.map((task, i) => {
                         const done = taskDone[goal.id]?.has(i);
                         return (
-                          <button key={i} onClick={() => toggleTask(goal.id, i)} className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-[#FAFAFA] transition-colors text-left">
+                          <button key={i} type="button" onClick={() => toggleTask(goal.id, i)} className="cursor-pointer w-full flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-[#FAFAFA] transition-colors text-left">
                             {done
                               ? <CheckSquare className="w-4 h-4 text-[#C8B3E0] shrink-0" />
                               : <Square className="w-4 h-4 text-[#C8C8C8] shrink-0" />}
@@ -235,7 +353,7 @@ export const Home: React.FC = () => {
 
       {/* Reflection Dialog */}
       <Dialog open={reflectionDialogOpen} onOpenChange={setReflectionDialogOpen}>
-        <DialogContent className="rounded-3xl max-w-md mx-4 bg-white">
+        <DialogContent className="rounded-3xl w-[92vw] max-w-lg mx-auto bg-white p-8">
           <DialogHeader>
             <DialogTitle className="text-2xl text-[#4A4A4A]">Add a Reflection</DialogTitle>
           </DialogHeader>

@@ -42,7 +42,7 @@ export const Login: React.FC = () => {
               <Users className="w-6 h-6 text-[#FFB5A0]" />
             </div>
           </div>
-          <h1 className="text-3xl mb-2 text-[#4A4A4A]">MindBuddy</h1>
+          <h1 className="text-3xl mb-2 text-[#4A4A4A]">Flock</h1>
           <p className="text-center text-[#8A8A8A]">Mental health accountability with friends</p>
         </div>
 

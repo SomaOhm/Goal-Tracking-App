@@ -75,7 +75,7 @@ export const Profile: React.FC = () => {
   };
 
   return (
-    <div className="pb-28 px-4 pt-6 max-w-md mx-auto">
+    <div className="pb-28 pt-6 w-full">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-3xl mb-2 text-[#4A4A4A]">Profile</h1>
@@ -196,7 +196,7 @@ export const Profile: React.FC = () => {
 
       {/* Check-in Dialog */}
       <Dialog open={checkInDialogOpen} onOpenChange={setCheckInDialogOpen}>
-        <DialogContent className="rounded-3xl max-w-md mx-4 bg-white">
+        <DialogContent className="rounded-3xl w-[92vw] max-w-lg mx-auto bg-white p-8">
           <DialogHeader>
             <DialogTitle className="text-2xl text-[#4A4A4A]">Daily Check-in</DialogTitle>
           </DialogHeader>

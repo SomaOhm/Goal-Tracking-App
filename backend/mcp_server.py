@@ -1,5 +1,5 @@
 """
-MindBuddy MCP Server
+Flock MCP Server
 
 Exposes Snowflake + Supabase data as MCP tools so that Gemini (or any
 MCP-compatible LLM) can fetch user and group context on demand.
@@ -44,7 +44,7 @@ REQUEST_TIMEOUT = 30.0  # seconds
 # ---------------------------------------------------------------------------
 # MCP server instance
 # ---------------------------------------------------------------------------
-mcp = FastMCP("mindbuddy")
+mcp = FastMCP("flock")
 
 
 # ---------------------------------------------------------------------------
@@ -229,5 +229,5 @@ def find_group_by_name(name: str) -> str:
 # Entry point
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    log.info("MindBuddy MCP server starting (API_BASE_URL=%s)", API_BASE_URL)
+    log.info("Flock MCP server starting (API_BASE_URL=%s)", API_BASE_URL)
     mcp.run(transport="stdio")

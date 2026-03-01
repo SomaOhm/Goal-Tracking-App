@@ -47,6 +47,17 @@ function toGroupIds(vis: unknown): string[] {
   const arr = Array.isArray(vis) ? vis : [vis];
   return arr.map((v: unknown) => (v && typeof v === 'object' && 'group_id' in v) ? (v as { group_id: string }).group_id : '').filter(Boolean);
 }
+
+/** Normalize group_ids from RPC (PostgREST may return UUID[] as array or as string). */
+function normalizeGroupIds(val: unknown): string[] {
+  if (Array.isArray(val)) return val.map((x) => String(x)).filter(Boolean);
+  if (typeof val === 'string') {
+    if (val.startsWith('[')) try { return JSON.parse(val).map((x: unknown) => String(x)); } catch { return []; }
+    if (val.includes(',')) return val.split(',').map((s) => s.trim().replace(/^"|"$/g, '')).filter(Boolean);
+    return val ? [val] : [];
+  }
+  return [];
+}
 const rowToGoal = (r: GoalRow): Goal => ({
   id: r.id, userId: r.user_id, title: r.title, description: r.description ?? '',
   frequency: r.frequency, customDays: r.custom_days ?? undefined, checklist: r.checklist ?? undefined,
@@ -97,14 +108,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const { data: withVis } = await supabase.rpc('get_shared_goals_with_visibility');
       if (withVis?.length) {
         const ids = new Set(allGoals.map(g => g.id));
+        const sharedGoalIds: string[] = [];
         for (const r of withVis) {
           if (ids.has(r.id)) continue;
-          const groupIds = Array.isArray(r.group_ids) ? r.group_ids : [];
+          const groupIds = normalizeGroupIds(r.group_ids);
+          sharedGoalIds.push(r.id);
           allGoals.push({
             id: r.id, userId: r.user_id, title: r.title, description: r.description ?? '', frequency: r.frequency,
             customDays: r.custom_days ?? undefined, checklist: r.checklist ?? undefined, startDate: r.start_date ?? undefined, endDate: r.end_date ?? undefined,
             completions: [], visibleToGroups: groupIds, createdAt: r.created_at,
           });
+        }
+        if (sharedGoalIds.length > 0) {
+          const { data: comps } = await supabase.from('goal_completions').select('goal_id, date, reflection').in('goal_id', sharedGoalIds);
+          if (comps?.length) {
+            for (const c of comps as { goal_id: string; date: string; reflection: string | null }[]) {
+              const g = allGoals.find((x) => x.id === c.goal_id);
+              if (g) g.completions.push({ date: c.date, reflection: c.reflection ?? undefined });
+            }
+          }
         }
         setGoals(allGoals);
         return;
@@ -130,6 +152,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             completions: [], visibleToGroups: visibilityMap[r.id] ?? [], createdAt: r.created_at,
           });
         }
+        if (sharedIds.length > 0) {
+          const { data: comps } = await supabase.from('goal_completions').select('goal_id, date, reflection').in('goal_id', sharedIds);
+          if (comps?.length) {
+            for (const c of comps as { goal_id: string; date: string; reflection: string | null }[]) {
+              const g = allGoals.find((x) => x.id === c.goal_id);
+              if (g) g.completions.push({ date: c.date, reflection: c.reflection ?? undefined });
+            }
+          }
+        }
       }
     } catch {}
 
@@ -150,7 +181,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const ids = new Set(allCIs.map(c => c.id));
         for (const r of withVis) {
           if (ids.has(r.id)) continue;
-          const groupIds = Array.isArray(r.group_ids) ? r.group_ids : [];
+          const groupIds = normalizeGroupIds(r.group_ids);
           allCIs.push({ id: r.id, userId: r.user_id, date: r.date, mood: r.mood, reflection: r.reflection ?? '', visibleToGroups: groupIds });
         }
         setCheckIns(allCIs);

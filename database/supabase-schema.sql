@@ -1,5 +1,5 @@
 -- =============================================================
--- MindBuddy Supabase Schema
+-- Flock Supabase Schema
 -- Run this in Supabase SQL Editor (Dashboard > SQL Editor > New query)
 -- =============================================================
 

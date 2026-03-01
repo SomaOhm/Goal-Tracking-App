@@ -9,7 +9,7 @@ export const WelcomeDialog: React.FC<{ open: boolean; onClose: () => void }> = (
   const steps = [
     {
       icon: Heart,
-      title: 'Welcome to MindBuddy!',
+      title: 'Welcome to Flock!',
       description: 'Your mental health accountability companion',
       color: '#FFB5A0',
     },
@@ -46,7 +46,7 @@ export const WelcomeDialog: React.FC<{ open: boolean; onClose: () => void }> = (
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="rounded-3xl max-w-md mx-4 bg-white">
+      <DialogContent className="rounded-3xl w-[92vw] max-w-xl mx-auto bg-white p-8">
         <DialogHeader>
           <div className="flex flex-col items-center mb-4">
             <div

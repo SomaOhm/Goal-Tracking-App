@@ -130,7 +130,10 @@ def _get_mcp_tools():
     if _MCP_TOOLS is not None:
         return _MCP_TOOLS
     if protos is None:
-        raise ValueError("google.generativeai not available (GEMINI_API_KEY not set?)")
+        raise ValueError(
+            "Gemini tool calling (protos) not available in this google-generativeai version. "
+            "Use a version that exposes protos, or use the coach endpoint without MCP tools."
+        )
 
     _MCP_TOOLS = protos.Tool(function_declarations=[
         protos.FunctionDeclaration(
@@ -245,20 +248,20 @@ def chat_with_mcp_tools(user_id: str, group_id: str | None, user_message: str) -
     get_group_context).  The model decides which tool(s) to call; we execute
     them against the Snowflake/Supabase service layer and return the results
     until Gemini produces a final text reply.
-
-    Args:
-        user_id:      UUID string of the current user.
-        group_id:     UUID string of the current group, or None.
-        user_message: Plain-text message from the user.
-
-    Returns:
-        Gemini's final text reply.
+    If protos is not available (SDK version), falls back to simple generation.
     """
     if not settings.GEMINI_API_KEY:
         raise ValueError("GEMINI_API_KEY not configured")
+    if not model:
+        raise ValueError("GEMINI_API_KEY not configured")
+
+    # Fallback when this SDK version doesn't expose protos (no tool calling)
+    if protos is None:
+        prompt = f"You are Flock, a supportive group accountability coach. User ID: {user_id}. Group ID: {group_id or 'none'}. User message: {user_message}. Reply concisely, warmly, and actionable."
+        return coach_ask(prompt)
 
     system_instruction = (
-        "You are MindBuddy, a supportive group accountability coach. "
+        "You are Flock, a supportive group accountability coach. "
         "Always use the available tools to fetch real-time data about the user's "
         "goals, progress, and group before responding — never answer from memory. "
         "Be specific: reference the user's actual goal names and data points. "

@@ -90,7 +90,7 @@ export const Chat: React.FC = () => {
         return;
       } else {
         const ctx = buildContext(user, goals, checkIns);
-        const prompt = `You are MindBuddy, a supportive mental health and wellness AI coach. You have access to this user's goal data:\n\n${ctx}\n\nUser message: ${userMsg}\n\nRespond helpfully. Use markdown formatting. Be warm but actionable. Reference their specific goals and progress when relevant.`;
+        const prompt = `You are Flock, a supportive mental health and wellness AI coach. You have access to this user's goal data:\n\n${ctx}\n\nUser message: ${userMsg}\n\nRespond helpfully. Use markdown formatting. Be warm but actionable. Reference their specific goals and progress when relevant.`;
         reply = await askGemini(prompt, signal);
       }
       setMessages(prev => [...prev, { role: 'ai', text: reply }]);
@@ -112,7 +112,7 @@ export const Chat: React.FC = () => {
 
   if (!isGeminiEnabled()) {
     return (
-      <div className="pb-28 px-4 pt-6 max-w-md mx-auto">
+      <div className="pb-28 pt-6 w-full">
         <h1 className="text-3xl mb-2 text-[#4A4A4A]">AI Coach</h1>
         <Card className="p-8 text-center rounded-3xl shadow-md border-none bg-white mt-4">
           <div className="w-16 h-16 rounded-full bg-[#E0D5F0] mx-auto mb-4 flex items-center justify-center">
@@ -126,14 +126,14 @@ export const Chat: React.FC = () => {
   }
 
   return (
-    <div className="pb-28 pt-6 max-w-md mx-auto flex flex-col" style={{ height: 'calc(100vh - 5rem)' }}>
+    <div className="pb-28 pt-6 w-full flex flex-col" style={{ height: 'calc(100vh - 5rem)' }}>
       <div className="px-4 flex items-center justify-between mb-3">
         <div>
           <h1 className="text-3xl text-[#4A4A4A]">AI Coach</h1>
           <p className="text-sm text-[#8A8A8A]">Personalized guidance for your goals</p>
         </div>
         {messages.length > 0 && (
-          <button onClick={clear} className="p-2 hover:bg-red-50 rounded-xl transition-colors">
+          <button type="button" onClick={clear} className="cursor-pointer p-2 hover:bg-red-50 rounded-xl transition-colors">
             <Trash2 className="w-5 h-5 text-red-400" />
           </button>
         )}
@@ -156,8 +156,8 @@ export const Chat: React.FC = () => {
             <p className="text-xs text-[#8A8A8A] px-1">Quick actions:</p>
             <div className="grid grid-cols-2 gap-2">
               {QUICK_PROMPTS.map(qp => (
-                <button key={qp.label} onClick={() => send(qp.prompt)}
-                  className="p-3 rounded-2xl bg-white border border-[#E0D5F0] text-left hover:bg-[#FAFAFA] transition-colors">
+                <button key={qp.label} type="button" onClick={() => send(qp.prompt)}
+                  className="cursor-pointer p-3 rounded-2xl bg-white border border-[#E0D5F0] text-left hover:bg-[#FAFAFA] transition-colors">
                   <p className="text-sm text-[#4A4A4A] font-medium">{qp.label}</p>
                 </button>
               ))}

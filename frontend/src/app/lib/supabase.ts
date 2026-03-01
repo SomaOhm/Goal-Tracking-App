@@ -12,7 +12,7 @@ export const supabase =
           detectSessionInUrl: false,
           flowType: 'implicit',
           lock: (async (_name: string, _timeout: number, fn: () => Promise<any>) => await fn()) as any,
-          storageKey: 'mindbuddy-auth',
+          storageKey: 'flock-auth',
         },
       })
     : null;

@@ -16,7 +16,7 @@ export const BottomNav: React.FC = () => {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#E0D5F0] shadow-2xl z-50">
-      <div className="max-w-md mx-auto flex justify-around items-center h-20 px-2">
+      <div className="max-w-6xl mx-auto flex justify-around items-center h-20 px-2">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
@@ -24,8 +24,9 @@ export const BottomNav: React.FC = () => {
           return (
             <button
               key={item.path}
+              type="button"
               onClick={() => navigate(item.path)}
-              className="flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-2xl transition-all"
+              className="cursor-pointer flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-2xl transition-all min-h-[44px] min-w-[44px]"
               style={{
                 color: isActive ? '#C8B3E0' : '#8A8A8A',
                 backgroundColor: isActive ? '#F5F0FF' : 'transparent',

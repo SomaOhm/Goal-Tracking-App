@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Plus, X, GripVertical } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Input } from '../components/ui/input';
@@ -18,21 +18,7 @@ export const FAB: React.FC = () => {
   const [tasks, setTasks] = useState<string[]>([]);
   const [newTask, setNewTask] = useState('');
   const [showAnim, setShowAnim] = useState(false);
-  const { addGoal, goals, user, apiReady } = useApp();
-  const autoOpened = useRef(false);
-
-  useEffect(() => {
-    if (!apiReady || !user || autoOpened.current) return;
-    if (goals.some(g => g.userId === user.id)) { autoOpened.current = true; return; }
-    const t = setTimeout(() => {
-      if (!autoOpened.current && !goals.some(g => g.userId === user.id)) {
-        autoOpened.current = true;
-        setOpen(true);
-      }
-    }, 2000);
-    return () => clearTimeout(t);
-  }, [apiReady, user, goals]);
-
+  const { addGoal } = useApp();
   const onAnimDone = useCallback(() => setShowAnim(false), []);
 
   const addTask = () => {
@@ -63,15 +49,17 @@ export const FAB: React.FC = () => {
     <>
       {showAnim && <CreationAnimation variant="goal" onComplete={onAnimDone} />}
       <button
+        type="button"
         onClick={() => setOpen(true)}
-        className="fixed bottom-24 right-6 w-16 h-16 rounded-full shadow-2xl flex items-center justify-center z-40 transition-transform hover:scale-110 active:scale-95"
+        className="cursor-pointer fixed bottom-24 right-6 w-16 h-16 rounded-full shadow-2xl flex items-center justify-center z-40 transition-transform hover:scale-110 active:scale-95"
         style={{ background: 'linear-gradient(135deg, #FFB5A0 0%, #FF9A7E 100%)' }}
+        aria-label="Create goal"
       >
-        <Plus className="w-8 h-8 text-white" />
+        <Plus className="w-8 h-8 text-white pointer-events-none" />
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="rounded-3xl max-w-md mx-4 bg-white max-h-[85vh] overflow-y-auto">
+        <DialogContent className="rounded-3xl w-[92vw] max-w-xl mx-auto bg-white max-h-[88vh] overflow-y-auto p-8">
           <DialogHeader>
             <DialogTitle className="text-2xl text-[#4A4A4A]">Create New Goal</DialogTitle>
           </DialogHeader>
@@ -118,7 +106,7 @@ export const FAB: React.FC = () => {
                     <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FFFBF7] border border-[#E0D5F0]">
                       <GripVertical className="w-3.5 h-3.5 text-[#C8C8C8] shrink-0" />
                       <span className="flex-1 text-sm text-[#4A4A4A] truncate">{task}</span>
-                      <button type="button" onClick={() => removeTask(i)} className="shrink-0 p-0.5 hover:bg-red-50 rounded-lg transition-colors">
+                      <button type="button" onClick={() => removeTask(i)} className="cursor-pointer shrink-0 p-0.5 hover:bg-red-50 rounded-lg transition-colors">
                         <X className="w-3.5 h-3.5 text-red-400" />
                       </button>
                     </div>

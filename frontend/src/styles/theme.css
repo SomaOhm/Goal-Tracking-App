@@ -197,10 +197,18 @@
     line-height: 1.5;
   }
 
-  button {
+  button,
+  [role="button"] {
     font-size: var(--text-base);
     font-weight: var(--font-weight-medium);
     line-height: 1.5;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  button:disabled,
+  [role="button"][aria-disabled="true"] {
+    cursor: not-allowed;
   }
 
   input {
