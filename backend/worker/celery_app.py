@@ -11,6 +11,9 @@ celery = Celery(
     include=["worker.sync_tasks", "worker.review_tasks"],
 )
 
+# Explicitly import task modules to ensure they're registered
+from worker import sync_tasks, review_tasks  # noqa: F401
+
 # Configure Celery
 celery.conf.update(
     task_serializer="json",
