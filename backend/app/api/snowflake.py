@@ -4,7 +4,9 @@ Snowflake (analytics) and Supabase (relational), intended to provide
 context for the Gemini chatbot.
 """
 
-from fastapi import APIRouter, HTTPException
+from typing import Optional
+
+from fastapi import APIRouter, HTTPException, Query
 
 from app.services.snowflake_service import (
     get_user_summary,
@@ -12,6 +14,7 @@ from app.services.snowflake_service import (
     get_group_member_summaries,
     build_group_context_string,
 )
+from app.supabase_client import get_supabase_client
 
 router = APIRouter(prefix="/snowflake", tags=["snowflake"])
 
@@ -99,5 +102,51 @@ def group_context(group_id: str):
             "group_name": group_name,
             "context":    context_str,
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# Group discovery
+# ---------------------------------------------------------------------------
+
+@router.get("/groups")
+def list_groups(
+    user_id: Optional[str] = Query(None, description="Filter to groups this user belongs to"),
+    name: Optional[str] = Query(None, description="Case-insensitive substring match on group name"),
+):
+    """
+    List all groups, optionally filtered by member user_id or name substring.
+
+    Returns a list of {id, name, member_count} objects so the chatbot or MCP
+    can discover group IDs from human-readable names.
+    """
+    try:
+        sb = get_supabase_client()
+
+        if user_id:
+            # Get group_ids the user belongs to
+            memberships = sb.table("group_members").select("group_id").eq("user_id", user_id).execute().data
+            group_ids = [r["group_id"] for r in memberships]
+            if not group_ids:
+                return []
+            rows = sb.table("groups").select("id, name").in_("id", group_ids).execute().data
+        else:
+            rows = sb.table("groups").select("id, name").execute().data
+
+        # Optionally filter by name substring (case-insensitive)
+        if name:
+            rows = [r for r in rows if name.lower() in r["name"].lower()]
+
+        # Enrich with member_count
+        result = []
+        for r in rows:
+            count_rows = sb.table("group_members").select("user_id", count="exact").eq("group_id", r["id"]).execute()
+            result.append({
+                "id":           r["id"],
+                "name":         r["name"],
+                "member_count": count_rows.count or 0,
+            })
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

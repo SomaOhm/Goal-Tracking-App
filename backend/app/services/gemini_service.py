@@ -6,7 +6,13 @@ from app.config import settings
 
 if settings.GEMINI_API_KEY:
     import google.generativeai as genai
-    from google.generativeai import protos
+    try:
+        from google.generativeai import protos
+    except ImportError:
+        try:
+            from google.ai import generativelanguage_v1beta as protos
+        except ImportError:
+            protos = None
     genai.configure(api_key=settings.GEMINI_API_KEY)
     model = genai.GenerativeModel("gemini-3-flash-preview")
 else:

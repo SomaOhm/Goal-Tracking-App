@@ -175,6 +175,56 @@ def get_group_context(group_id: str) -> str:
         return str(e)
 
 
+@mcp.tool()
+def list_groups(user_id: str = "") -> str:
+    """
+    List all groups in the system, optionally filtered to groups a specific
+    user belongs to.
+
+    Returns a JSON array of {id, name, member_count} objects.
+
+    Use this to discover what groups exist before calling get_group_members
+    or get_group_context, or when the user asks "what groups am I in?" or
+    "what groups are there?".
+
+    Args:
+        user_id: (optional) UUID of a user to filter to their groups only.
+                 Pass an empty string to list all groups.
+    """
+    try:
+        path = "/snowflake/groups"
+        if user_id.strip():
+            path += f"?user_id={user_id.strip()}"
+        data = _get(path)
+        return json.dumps(data, indent=2, default=str)
+    except RuntimeError as e:
+        return str(e)
+
+
+@mcp.tool()
+def find_group_by_name(name: str) -> str:
+    """
+    Find a group by name (case-insensitive substring match).
+
+    Returns a JSON array of matching {id, name, member_count} objects.
+    Use this when the user mentions a group by name and you need its UUID
+    to call get_group_members or get_group_context.
+
+    Args:
+        name: Full or partial group name to search for (e.g. "running" or
+              "Running More").
+    """
+    try:
+        import urllib.parse
+        encoded = urllib.parse.quote(name)
+        data = _get(f"/snowflake/groups?name={encoded}")
+        if not data:
+            return f"No groups found matching '{name}'."
+        return json.dumps(data, indent=2, default=str)
+    except RuntimeError as e:
+        return str(e)
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
