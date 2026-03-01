@@ -70,7 +70,6 @@ export const Groups: React.FC = () => {
         : `Give a full group analysis. Summarize overall group health, identify members who are excelling and who may need support, spot trends, and suggest actions a coach or group leader could take.`;
 
     const prompt = `You are MindBuddy, an AI wellness analyst for coaches and therapists. Analyze this accountability group data:\n\n${ctx}\n${mode}\n\nUse markdown. Be specific — reference names, goals, and data points.`;
-    const contextForBackend = `${ctx}\nInstruction: ${mode}`;
 
     setAiLoading(true);
     setAiResult('');
@@ -78,7 +77,7 @@ export const Groups: React.FC = () => {
       abortRef.current = new AbortController();
       const signal = abortRef.current.signal;
       const reply = getBackendUrl()
-        ? await coachGroupAnalysisBackend(contextForBackend, signal)
+        ? await coachGroupAnalysisBackend(groupId, mode, signal)
         : await askGemini(prompt, signal);
       setAiResult(reply);
     } catch (e: any) {

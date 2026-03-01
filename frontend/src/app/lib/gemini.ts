@@ -51,13 +51,13 @@ export async function coachAskBackend(userId: string, message: string, signal?: 
   return data.reply ?? 'No response generated.';
 }
 
-export async function coachGroupAnalysisBackend(context: string, signal?: AbortSignal): Promise<string> {
+export async function coachGroupAnalysisBackend(groupId: string, instruction: string, signal?: AbortSignal): Promise<string> {
   if (!BACKEND_URL) throw new Error('Backend URL not configured');
   const res = await fetch(`${BACKEND_URL}/coach/group-analysis`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     signal,
-    body: JSON.stringify({ context }),
+    body: JSON.stringify({ group_id: groupId, instruction }),
   });
   if (!res.ok) {
     const errText = await res.text().catch(() => '');

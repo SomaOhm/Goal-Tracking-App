@@ -16,6 +16,8 @@ __pycache__/
 *.py[cod]
 *.pyc
 .pytest_cache/
+.venv/
+**/.venv/
 
 # Celery
 backend/celerybeat-schedule
