@@ -10,18 +10,18 @@ Flock helps users set and achieve goals through daily accountability check-ins, 
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│              Frontend  (React 18 + Vite + Tailwind)          │
+│              Frontend  (React 18 + Vite + Tailwind)         │
 └──────────────────────────┬──────────────────────────────────┘
                            │ REST
 ┌──────────────────────────▼──────────────────────────────────┐
-│                    FastAPI Backend (Python 3.10+)            │
-│  /goals/   /chat/   /coach/   /mentor/   /mentor/chat/       │
-│  /dashboard/   /checkin/   /member/   /snowflake/            │
-└──────────┬──────────────────────────┬────────────────────────┘
+│                    FastAPI Backend (Python 3.10+)           │
+│  /goals/   /chat/   /coach/   /mentor/   /mentor/chat/      │
+│  /dashboard/   /checkin/   /member/   /snowflake/           │
+└──────────┬──────────────────────────┬───────────────────────┘
            │                          │
     ┌──────▼──────┐          ┌────────▼──────────┐
-    │  Supabase   │          │   Gemini API       │
-    │ (PostgreSQL)│          │  (AI Generation)   │
+    │  Supabase   │          │   Gemini API      │
+    │ (PostgreSQL)│          │  (AI Generation)  │
     └──────┬──────┘          └───────────────────┘
            │
     ┌──────▼──────────────────────┐
@@ -31,7 +31,7 @@ Flock helps users set and achieve goals through daily accountability check-ins, 
     │   └─ reminder_tasks         │
     └──────┬──────────────────────┘
            │
-    ┌──────▼─────────────────────┐
+    ┌──────▼──────────────────────┐
     │    Snowflake Analytics      │
     │  ├─ dim_users, dim_goals    │
     │  ├─ fact_checkins           │
