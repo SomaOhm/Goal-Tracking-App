@@ -4,10 +4,15 @@ dist/
 *.local
 .DS_Store
 .vite/
-__pycache__/
-*.pyc
+backend/.env
 .env.*
 !.env.example
 frontend/node_modules/
 frontend/.env
-backend/.env
+
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyc
+.pytest_cache/
