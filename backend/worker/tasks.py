@@ -12,16 +12,16 @@ from worker.review_tasks import (
     monthly_progress_report
 )
 from worker.sync_tasks import (
-    sync_checkins_to_snowflake,
-    sync_goals_to_snowflake,
-    sync_users_to_snowflake
+    sync_postgres_to_snowflake,
+    compute_adherence_scores,
+    compute_risk_metrics,
 )
 
 __all__ = [
     "weekly_goal_review",
     "daily_goal_reminder",
     "monthly_progress_report",
-    "sync_checkins_to_snowflake",
-    "sync_goals_to_snowflake",
-    "sync_users_to_snowflake",
+    "sync_postgres_to_snowflake",
+    "compute_adherence_scores",
+    "compute_risk_metrics",
 ]

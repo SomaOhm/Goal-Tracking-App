@@ -1,18 +1,21 @@
 """Gemini AI service for goal planning, progress reviews, and mentor assistance."""
 
-import os
-from dotenv import load_dotenv
-import google.generativeai as genai
+from app.config import settings
 
-load_dotenv()
+if settings.GEMINI_API_KEY:
+    import google.generativeai as genai
+    genai.configure(api_key=settings.GEMINI_API_KEY)
+    model = genai.GenerativeModel("gemini-3-flash-preview")
+else:
+    model = None
 
-api_key = os.getenv("GEMINI_API_KEY")
-if not api_key:
-    raise ValueError("GEMINI_API_KEY not found in .env file")
 
-genai.configure(api_key=api_key)
-
-model = genai.GenerativeModel("gemini-3-flash-preview")
+def coach_ask(prompt: str) -> str:
+    """Sync call to Gemini for coach/group analysis. Returns reply text or raises."""
+    if not model:
+        raise ValueError("GEMINI_API_KEY not configured")
+    response = model.generate_content(prompt)
+    return response.text if response and response.text else "No response generated."
 
 async def generate_goal_plan(user_description, group_theme, constraints):
     """
@@ -41,6 +44,8 @@ async def generate_goal_plan(user_description, group_theme, constraints):
     }}
     """
 
+    if not model:
+        raise ValueError("GEMINI_API_KEY not configured")
     response = model.generate_content(prompt)
     return response.text
 
@@ -65,7 +70,8 @@ async def review_progress(context_summary):
     Context:
     {context_summary}
     """
-
+    if not model:
+        raise ValueError("GEMINI_API_KEY not configured")
     response = model.generate_content(prompt)
     return response.text
 
@@ -93,6 +99,7 @@ async def mentor_copilot(context, mentor_message):
     Mentor message:
     {mentor_message}
     """
-
+    if not model:
+        raise ValueError("GEMINI_API_KEY not configured")
     response = model.generate_content(prompt)
     return response.text

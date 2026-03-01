@@ -8,7 +8,7 @@ import { Users, Plus, Copy, Check, UserPlus, Settings, Heart, Flame, Calendar, T
 import { format } from 'date-fns';
 import { Switch } from '../components/ui/switch';
 import { CreationAnimation } from '../components/CreationAnimation';
-import { askGemini, isGeminiEnabled } from '../lib/gemini';
+import { askGemini, isGeminiEnabled, getBackendUrl, coachGroupAnalysisBackend } from '../lib/gemini';
 
 export const Groups: React.FC = () => {
   const { user, groups, users, goals, checkIns, createGroup, joinGroup, leaveGroup, deleteGroup, updateGoal } = useApp();
@@ -70,12 +70,16 @@ export const Groups: React.FC = () => {
         : `Give a full group analysis. Summarize overall group health, identify members who are excelling and who may need support, spot trends, and suggest actions a coach or group leader could take.`;
 
     const prompt = `You are MindBuddy, an AI wellness analyst for coaches and therapists. Analyze this accountability group data:\n\n${ctx}\n${mode}\n\nUse markdown. Be specific — reference names, goals, and data points.`;
+    const contextForBackend = `${ctx}\nInstruction: ${mode}`;
 
     setAiLoading(true);
     setAiResult('');
     try {
       abortRef.current = new AbortController();
-      const reply = await askGemini(prompt, abortRef.current.signal);
+      const signal = abortRef.current.signal;
+      const reply = getBackendUrl()
+        ? await coachGroupAnalysisBackend(contextForBackend, signal)
+        : await askGemini(prompt, signal);
       setAiResult(reply);
     } catch (e: any) {
       if (e.name !== 'AbortError') setAiResult(`Error: ${e.message}`);
@@ -114,9 +118,8 @@ export const Groups: React.FC = () => {
   const toggleVisibility = (goalId: string, groupId: string) => {
     const goal = myGoals.find(g => g.id === goalId);
     if (!goal) return;
-    const vis = goal.visibleToGroups.includes(groupId)
-      ? goal.visibleToGroups.filter(g => g !== groupId)
-      : [...goal.visibleToGroups, groupId];
+    const current = goal.visibleToGroups ?? [];
+    const vis = current.includes(groupId) ? current.filter(g => g !== groupId) : [...current, groupId];
     updateGoal(goalId, { visibleToGroups: vis });
   };
 
@@ -201,6 +204,21 @@ export const Groups: React.FC = () => {
                   <button onClick={() => copyCode(active.inviteCode)} className="p-2 hover:bg-white rounded-xl transition-colors">
                     {copiedCode === active.inviteCode ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4 text-[#C8B3E0]" />}
                   </button>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => { setDetailOpen(false); setSettingsOpen(true); }} className="flex-1 rounded-2xl h-10 text-sm border-[#E0D5F0] text-[#8A8A8A]">
+                    <Settings className="w-4 h-4 mr-1" /> Settings & goal visibility
+                  </Button>
+                  {active.createdBy === user?.id ? (
+                    <Button variant="outline" onClick={() => { if (confirm('Delete this group? All members will be removed.')) { deleteGroup(active.id); setDetailOpen(false); setSelected(null); } }} className="rounded-2xl h-10 text-sm border-red-200 text-red-500 hover:bg-red-50">
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  ) : (
+                    <Button variant="outline" onClick={() => { if (confirm('Leave this group?')) { leaveGroup(active.id); setDetailOpen(false); setSelected(null); } }} className="rounded-2xl h-10 text-sm border-orange-200 text-orange-500 hover:bg-orange-50">
+                      <LogOut className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
 
                 <div className="space-y-3">
@@ -298,21 +316,6 @@ export const Groups: React.FC = () => {
                     )}
                   </div>
                 )}
-
-                <div className="flex gap-2 pt-2">
-                  <Button variant="outline" onClick={() => { setDetailOpen(false); setSettingsOpen(true); }} className="flex-1 rounded-2xl h-10 text-sm border-[#E0D5F0] text-[#8A8A8A]">
-                    <Settings className="w-4 h-4 mr-1" /> Settings
-                  </Button>
-                  {active.createdBy === user?.id ? (
-                    <Button variant="outline" onClick={() => { if (confirm('Delete this group? All members will be removed.')) { deleteGroup(active.id); setDetailOpen(false); setSelected(null); } }} className="rounded-2xl h-10 text-sm border-red-200 text-red-500 hover:bg-red-50">
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  ) : (
-                    <Button variant="outline" onClick={() => { if (confirm('Leave this group?')) { leaveGroup(active.id); setDetailOpen(false); setSelected(null); } }} className="rounded-2xl h-10 text-sm border-orange-200 text-orange-500 hover:bg-orange-50">
-                      <LogOut className="w-4 h-4" />
-                    </Button>
-                  )}
-                </div>
               </div>
             </>
           )}
@@ -355,12 +358,16 @@ export const Groups: React.FC = () => {
               <p className="text-center text-[#8A8A8A] py-4">No goals yet</p>
             ) : (
               <div className="space-y-3 max-h-48 overflow-y-auto">
-                {myGoals.map(goal => (
-                  <div key={goal.id} className="flex items-center justify-between p-4 rounded-2xl bg-[#FFFBF7]">
-                    <span className="text-[#4A4A4A]">{goal.title}</span>
-                    <Switch checked={goal.visibleToGroups.includes(selected || '')} onCheckedChange={() => toggleVisibility(goal.id, selected || '')} />
-                  </div>
-                ))}
+                {myGoals.map(goal => {
+                  const groupId = selected ?? '';
+                  const isVisibleToGroup = Boolean(groupId && (goal.visibleToGroups ?? []).includes(groupId));
+                  return (
+                    <div key={goal.id} className="flex items-center justify-between p-4 rounded-2xl bg-[#FFFBF7]">
+                      <span className="text-[#4A4A4A]">{goal.title}</span>
+                      <Switch checked={isVisibleToGroup} onCheckedChange={() => groupId && toggleVisibility(goal.id, groupId)} />
+                    </div>
+                  );
+                })}
               </div>
             )}
             <div className="border-t border-[#F0F0F0] pt-4 space-y-3">

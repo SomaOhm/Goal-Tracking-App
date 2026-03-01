@@ -205,6 +205,21 @@ returns setof public.goals as $$
   where gm.user_id = auth.uid() and g.user_id != auth.uid();
 $$ language sql security definer stable;
 
+-- Returns shared goals with their visible group_ids in one call (avoids client-side visibility query).
+create or replace function public.get_shared_goals_with_visibility()
+returns table (
+  id uuid, user_id uuid, title text, description text, frequency text, custom_days int[], checklist text[], start_date date, end_date date, created_at timestamptz,
+  group_ids uuid[]
+) as $$
+  select g.id, g.user_id, g.title, g.description, g.frequency, g.custom_days, g.checklist, g.start_date, g.end_date, g.created_at,
+         coalesce(array_agg(distinct gv.group_id), '{}'::uuid[]) as group_ids
+  from public.goals g
+  join public.goal_visibility gv on gv.goal_id = g.id
+  join public.group_members gm on gm.group_id = gv.group_id
+  where gm.user_id = auth.uid() and g.user_id != auth.uid()
+  group by g.id, g.user_id, g.title, g.description, g.frequency, g.custom_days, g.checklist, g.start_date, g.end_date, g.created_at;
+$$ language sql security definer stable;
+
 create or replace function public.get_shared_check_ins()
 returns setof public.check_ins as $$
   select distinct ci.*
@@ -212,6 +227,21 @@ returns setof public.check_ins as $$
   join public.check_in_visibility civ on civ.check_in_id = ci.id
   join public.group_members gm on gm.group_id = civ.group_id
   where gm.user_id = auth.uid() and ci.user_id != auth.uid();
+$$ language sql security definer stable;
+
+-- Returns shared check-ins with their visible group_ids in one call.
+create or replace function public.get_shared_check_ins_with_visibility()
+returns table (
+  id uuid, user_id uuid, date date, mood int, reflection text, created_at timestamptz,
+  group_ids uuid[]
+) as $$
+  select ci.id, ci.user_id, ci.date, ci.mood, ci.reflection, ci.created_at,
+         coalesce(array_agg(distinct civ.group_id), '{}'::uuid[]) as group_ids
+  from public.check_ins ci
+  join public.check_in_visibility civ on civ.check_in_id = ci.id
+  join public.group_members gm on gm.group_id = civ.group_id
+  where gm.user_id = auth.uid() and ci.user_id != auth.uid()
+  group by ci.id, ci.user_id, ci.date, ci.mood, ci.reflection, ci.created_at;
 $$ language sql security definer stable;
 
 -- =====================

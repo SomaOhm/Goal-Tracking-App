@@ -7,7 +7,8 @@ from celery.schedules import crontab
 celery = Celery(
     "goal_tracking",
     broker=os.getenv("REDIS_URL", "redis://localhost:6379/0"),
-    backend=os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    backend=os.getenv("REDIS_URL", "redis://localhost:6379/0"),
+    include=["worker.sync_tasks", "worker.review_tasks"],
 )
 
 # Configure Celery
@@ -22,11 +23,10 @@ celery.conf.update(
 
 # Beat schedule for periodic tasks
 celery.conf.beat_schedule = {
-    # Data synchronization (every 5 minutes)
+    # Incremental Postgres → Snowflake sync (every 2 minutes)
     'sync-postgres-to-snowflake': {
-        'task': 'worker.sync_tasks.sync_all_data_to_snowflake',
-        'schedule': crontab(minute='*/5'),
-        'kwargs': {},
+        'task': 'worker.sync_tasks.sync_postgres_to_snowflake',
+        'schedule': 120.0,
     },
     
     # Analytics computation (every 6 hours)
@@ -44,32 +44,26 @@ celery.conf.beat_schedule = {
     # Daily reminders (7 AM UTC)
     'daily-goal-reminder': {
         'task': 'worker.review_tasks.daily_goal_reminder',
-        'schedule': crontab(hour=7, minute=0),
+        'schedule': crontab(hour='7', minute='0'),
     },
     
     # Weekly comprehensive review (Monday 9 AM UTC)
     'weekly-goal-review': {
         'task': 'worker.review_tasks.weekly_goal_review',
-        'schedule': crontab(day_of_week=0, hour=9, minute=0),
+        'schedule': crontab(day_of_week='0', hour='9', minute='0'),
     },
     
     # Plan suggestions (Wednesday 10 AM UTC)
     'generate-plan-suggestions': {
         'task': 'worker.review_tasks.generate_plan_suggestions',
-        'schedule': crontab(day_of_week=2, hour=10, minute=0),
+        'schedule': crontab(day_of_week='2', hour='10', minute='0'),
     },
     
     # Monthly report (1st of month, 8 AM UTC)
     'monthly-progress-report': {
         'task': 'worker.review_tasks.monthly_progress_report',
-        'schedule': crontab(day_of_month=1, hour=8, minute=0),
+        'schedule': crontab(day_of_month='1', hour='8', minute='0'),
     },
-}
-
-# Task routes for different queues (optional)
-celery.conf.task_routes = {
-    'worker.sync_tasks.*': {'queue': 'sync'},
-    'worker.review_tasks.*': {'queue': 'reviews'},
 }
 
 # Task time limits
