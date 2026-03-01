@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { useApp } from '../context/AppContext';
 import { Card } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -171,12 +172,30 @@ export const Chat: React.FC = () => {
                 <Bot className="w-4 h-4 text-[#C8B3E0]" />
               </div>
             )}
-            <div className={`max-w-[80%] px-4 py-3 rounded-2xl text-sm whitespace-pre-wrap ${
+            <div className={`max-w-[85%] px-4 py-3 rounded-2xl text-sm ${
               msg.role === 'user'
                 ? 'bg-gradient-to-br from-[#C8B3E0] to-[#B39DD1] text-white'
                 : 'bg-white border border-[#F0F0F0] text-[#4A4A4A]'
             }`}>
-              {msg.text}
+              {msg.role === 'ai' ? (
+                <ReactMarkdown
+                  components={{
+                    p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                    ul: ({ children }) => <ul className="list-disc pl-4 my-2 space-y-0.5">{children}</ul>,
+                    ol: ({ children }) => <ol className="list-decimal pl-4 my-2 space-y-0.5">{children}</ol>,
+                    li: ({ children }) => <li className="leading-snug">{children}</li>,
+                    strong: ({ children }) => <strong className="font-semibold text-[#3A3A3A]">{children}</strong>,
+                    code: ({ children }) => <code className="bg-[#F5F0FF] px-1.5 py-0.5 rounded text-xs">{children}</code>,
+                    h1: ({ children }) => <h1 className="text-base font-semibold mt-3 mb-1">{children}</h1>,
+                    h2: ({ children }) => <h2 className="text-sm font-semibold mt-3 mb-1">{children}</h2>,
+                    h3: ({ children }) => <h3 className="text-sm font-semibold mt-2 mb-1">{children}</h3>,
+                  }}
+                >
+                  {msg.text}
+                </ReactMarkdown>
+              ) : (
+                <span className="whitespace-pre-wrap">{msg.text}</span>
+              )}
             </div>
             {msg.role === 'user' && (
               <div className="w-7 h-7 rounded-full bg-[#FFD4C8] flex items-center justify-center shrink-0 mt-1">
