@@ -16,3 +16,8 @@ __pycache__/
 *.py[cod]
 *.pyc
 .pytest_cache/
+
+# Celery
+backend/celerybeat-schedule
+backend/celerybeat-schedule-shm
+backend/celerybeat-schedule-wal

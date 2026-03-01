@@ -7,8 +7,8 @@ _ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 
 
 class Settings(BaseSettings):
-    # Supabase PostgreSQL Connection — must use postgresql+psycopg:// (psycopg3 driver)
-    # Format: postgresql+psycopg://postgres.[project-id]:[password]@db.[project-id].supabase.co:5432/postgres
+    # Supabase PostgreSQL — must set in backend/.env (no working default).
+    # Use postgresql+psycopg:// (psycopg3). From Supabase: Settings → Database → Connection string (URI).
     DATABASE_URL: str = "postgresql+psycopg://localhost/goaltracking"
 
     # Supabase REST client credentials (used by supabase-py for the sync path)

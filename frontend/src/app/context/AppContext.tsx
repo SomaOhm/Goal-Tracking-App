@@ -40,14 +40,19 @@ interface GoalRow {
   frequency: 'daily' | 'weekly' | 'custom'; custom_days: number[] | null; checklist: string[] | null;
   start_date: string | null; end_date: string | null;
   created_at: string; goal_completions: { date: string; reflection: string | null }[];
-  goal_visibility: { group_id: string }[];
+  goal_visibility?: { group_id: string }[] | null;
+}
+function toGroupIds(vis: unknown): string[] {
+  if (!vis) return [];
+  const arr = Array.isArray(vis) ? vis : [vis];
+  return arr.map((v: unknown) => (v && typeof v === 'object' && 'group_id' in v) ? (v as { group_id: string }).group_id : '').filter(Boolean);
 }
 const rowToGoal = (r: GoalRow): Goal => ({
   id: r.id, userId: r.user_id, title: r.title, description: r.description ?? '',
   frequency: r.frequency, customDays: r.custom_days ?? undefined, checklist: r.checklist ?? undefined,
   startDate: r.start_date ?? undefined, endDate: r.end_date ?? undefined,
   completions: (r.goal_completions ?? []).map(c => ({ date: c.date, reflection: c.reflection ?? undefined })),
-  visibleToGroups: (r.goal_visibility ?? []).map(v => v.group_id), createdAt: r.created_at,
+  visibleToGroups: toGroupIds(r.goal_visibility), createdAt: r.created_at,
 });
 
 interface CheckInRow {
@@ -89,11 +94,41 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const allGoals = (data as GoalRow[]).map(rowToGoal);
 
     try {
+      const { data: withVis } = await supabase.rpc('get_shared_goals_with_visibility');
+      if (withVis?.length) {
+        const ids = new Set(allGoals.map(g => g.id));
+        for (const r of withVis) {
+          if (ids.has(r.id)) continue;
+          const groupIds = Array.isArray(r.group_ids) ? r.group_ids : [];
+          allGoals.push({
+            id: r.id, userId: r.user_id, title: r.title, description: r.description ?? '', frequency: r.frequency,
+            customDays: r.custom_days ?? undefined, checklist: r.checklist ?? undefined, startDate: r.start_date ?? undefined, endDate: r.end_date ?? undefined,
+            completions: [], visibleToGroups: groupIds, createdAt: r.created_at,
+          });
+        }
+        setGoals(allGoals);
+        return;
+      }
       const { data: shared } = await supabase.rpc('get_shared_goals');
       if (shared?.length) {
         const ids = new Set(allGoals.map(g => g.id));
+        const sharedIds = shared.map((r: { id: string }) => r.id).filter((id: string) => !ids.has(id));
+        let visibilityMap: Record<string, string[]> = {};
+        if (sharedIds.length > 0) {
+          const { data: vis } = await supabase.from('goal_visibility').select('goal_id, group_id').in('goal_id', sharedIds);
+          if (vis?.length) {
+            for (const v of vis as { goal_id: string; group_id: string }[]) {
+              if (!visibilityMap[v.goal_id]) visibilityMap[v.goal_id] = [];
+              visibilityMap[v.goal_id].push(v.group_id);
+            }
+          }
+        }
         for (const r of shared) {
-          if (!ids.has(r.id)) allGoals.push({ id: r.id, userId: r.user_id, title: r.title, description: r.description ?? '', frequency: r.frequency, completions: [], visibleToGroups: [], createdAt: r.created_at });
+          if (!ids.has(r.id)) allGoals.push({
+            id: r.id, userId: r.user_id, title: r.title, description: r.description ?? '', frequency: r.frequency,
+            customDays: r.custom_days ?? undefined, checklist: r.checklist ?? undefined, startDate: r.start_date ?? undefined, endDate: r.end_date ?? undefined,
+            completions: [], visibleToGroups: visibilityMap[r.id] ?? [], createdAt: r.created_at,
+          });
         }
       }
     } catch {}
@@ -110,11 +145,33 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const allCIs = (data as CheckInRow[]).map(rowToCheckIn);
 
     try {
+      const { data: withVis } = await supabase.rpc('get_shared_check_ins_with_visibility');
+      if (withVis?.length) {
+        const ids = new Set(allCIs.map(c => c.id));
+        for (const r of withVis) {
+          if (ids.has(r.id)) continue;
+          const groupIds = Array.isArray(r.group_ids) ? r.group_ids : [];
+          allCIs.push({ id: r.id, userId: r.user_id, date: r.date, mood: r.mood, reflection: r.reflection ?? '', visibleToGroups: groupIds });
+        }
+        setCheckIns(allCIs);
+        return;
+      }
       const { data: shared } = await supabase.rpc('get_shared_check_ins');
       if (shared?.length) {
         const ids = new Set(allCIs.map(c => c.id));
+        const sharedIds = shared.map((r: { id: string }) => r.id).filter((id: string) => !ids.has(id));
+        let visibilityMap: Record<string, string[]> = {};
+        if (sharedIds.length > 0) {
+          const { data: vis } = await supabase.from('check_in_visibility').select('check_in_id, group_id').in('check_in_id', sharedIds);
+          if (vis?.length) {
+            for (const v of vis as { check_in_id: string; group_id: string }[]) {
+              if (!visibilityMap[v.check_in_id]) visibilityMap[v.check_in_id] = [];
+              visibilityMap[v.check_in_id].push(v.group_id);
+            }
+          }
+        }
         for (const r of shared) {
-          if (!ids.has(r.id)) allCIs.push({ id: r.id, userId: r.user_id, date: r.date, mood: r.mood, reflection: r.reflection ?? '', visibleToGroups: [] });
+          if (!ids.has(r.id)) allCIs.push({ id: r.id, userId: r.user_id, date: r.date, mood: r.mood, reflection: r.reflection ?? '', visibleToGroups: visibilityMap[r.id] ?? [] });
         }
       }
     } catch {}
