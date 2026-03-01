@@ -11,7 +11,7 @@ People who want to establish and maintain habits, track personal goals (mental h
 ### Core Value Proposition
 A seamless goal-tracking experience paired with a transparent, automated accountability loop to an external professional or partner. Includes an integrated reflective diary and an AI chat agent for internal guidance and support.
 
-## Features In Progress
+## Features
 
 ### Member App
 - Daily goal check-in (met/not met)
