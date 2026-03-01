@@ -4,7 +4,7 @@ import { Card } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Textarea } from '../components/ui/textarea';
 import { Send, Sparkles, Loader2, Bot, User as UserIcon, Trash2 } from 'lucide-react';
-import { askGemini, isGeminiEnabled } from '../lib/gemini';
+import { askGemini, isGeminiEnabled, getBackendUrl, coachAskBackend } from '../lib/gemini';
 import { format } from 'date-fns';
 
 interface Message { role: 'user' | 'ai'; text: string }
@@ -79,9 +79,19 @@ export const Chat: React.FC = () => {
 
     try {
       abortRef.current = new AbortController();
-      const ctx = buildContext(user, goals, checkIns);
-      const prompt = `You are MindBuddy, a supportive mental health and wellness AI coach. You have access to this user's goal data:\n\n${ctx}\n\nUser message: ${userMsg}\n\nRespond helpfully. Use markdown formatting. Be warm but actionable. Reference their specific goals and progress when relevant.`;
-      const reply = await askGemini(prompt, abortRef.current.signal);
+      const signal = abortRef.current.signal;
+      const backendUrl = getBackendUrl();
+      let reply: string;
+      if (backendUrl && user?.id) {
+        reply = await coachAskBackend(user.id, userMsg, signal);
+      } else if (backendUrl && !user?.id) {
+        setMessages(prev => [...prev, { role: 'ai', text: 'Please sign in to use the AI coach.' }]);
+        return;
+      } else {
+        const ctx = buildContext(user, goals, checkIns);
+        const prompt = `You are MindBuddy, a supportive mental health and wellness AI coach. You have access to this user's goal data:\n\n${ctx}\n\nUser message: ${userMsg}\n\nRespond helpfully. Use markdown formatting. Be warm but actionable. Reference their specific goals and progress when relevant.`;
+        reply = await askGemini(prompt, signal);
+      }
       setMessages(prev => [...prev, { role: 'ai', text: reply }]);
     } catch (e: any) {
       if (e.name !== 'AbortError') {
@@ -108,7 +118,7 @@ export const Chat: React.FC = () => {
             <Sparkles className="w-8 h-8 text-[#C8B3E0]" />
           </div>
           <p className="text-[#4A4A4A] mb-2 font-medium">AI Coach not configured</p>
-          <p className="text-sm text-[#8A8A8A]">Add <code className="bg-[#F5F0FF] px-1.5 py-0.5 rounded text-xs">VITE_GEMINI_API_KEY</code> to your <code className="bg-[#F5F0FF] px-1.5 py-0.5 rounded text-xs">.env</code> file to enable.</p>
+          <p className="text-sm text-[#8A8A8A]">Set <code className="bg-[#F5F0FF] px-1.5 py-0.5 rounded text-xs">VITE_API_URL</code> to your backend (recommended) or <code className="bg-[#F5F0FF] px-1.5 py-0.5 rounded text-xs">VITE_GEMINI_API_KEY</code> in <code className="bg-[#F5F0FF] px-1.5 py-0.5 rounded text-xs">.env</code> to enable.</p>
         </Card>
       </div>
     );

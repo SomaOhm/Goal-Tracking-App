@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     SNOWFLAKE_SCHEMA: str = "PUBLIC"
     SNOWFLAKE_ROLE: str = ""
 
+    GEMINI_API_KEY: str = ""
+
     class Config:
         env_file = str(_ENV_FILE)
         env_file_encoding = "utf-8"

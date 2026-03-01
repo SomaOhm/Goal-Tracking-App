@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import member, mentor, goals, dashboard, chat, mentor_chat
+from app.api import member, mentor, goals, dashboard, chat, mentor_chat, coach
 from app.database import engine, Base
 
 
@@ -39,6 +39,7 @@ app.include_router(goals.router)
 app.include_router(dashboard.router)
 app.include_router(chat.router)
 app.include_router(mentor_chat.router)
+app.include_router(coach.router)
 
 
 @app.get("/")
