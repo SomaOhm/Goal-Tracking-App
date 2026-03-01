@@ -126,7 +126,7 @@ class GroupFeedPost(Base):
     user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
     content = Column(Text, nullable=False)
     post_type = Column(String)  # human, ai_coach, milestone
-    post_metadata = Column(JSON, nullable=True)
+    post_metadata = Column("metadata", JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -158,3 +158,18 @@ class MentorInteraction(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     patient = relationship("User", foreign_keys=[patient_id])
+
+
+class SyncWatermark(Base):
+    """
+    Tracks the incremental sync state for each Postgres → Snowflake table.
+    One row per source table; upserted after every successful sync batch.
+    """
+    __tablename__ = "sync_watermarks"
+
+    source_table = Column(Text, primary_key=True)
+    last_watermark = Column(DateTime, nullable=True)   # highest watermark synced
+    last_run = Column(DateTime, nullable=True)          # wall-clock time of last run
+    last_status = Column(Text, nullable=True)           # ok | idle | error
+    last_error = Column(Text, nullable=True)            # error message if status=error
+    rows_processed = Column(Integer, nullable=True)     # rows synced in last run
