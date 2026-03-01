@@ -8,7 +8,7 @@ import { Users, Plus, Copy, Check, UserPlus, Settings, Heart, Flame, Calendar, T
 import { format } from 'date-fns';
 import { Switch } from '../components/ui/switch';
 import { CreationAnimation } from '../components/CreationAnimation';
-import { askGemini, isGeminiEnabled } from '../lib/gemini';
+import { askGemini, isGeminiEnabled, getBackendUrl, coachGroupAnalysisBackend } from '../lib/gemini';
 
 export const Groups: React.FC = () => {
   const { user, groups, users, goals, checkIns, createGroup, joinGroup, leaveGroup, deleteGroup, updateGoal } = useApp();
@@ -70,12 +70,16 @@ export const Groups: React.FC = () => {
         : `Give a full group analysis. Summarize overall group health, identify members who are excelling and who may need support, spot trends, and suggest actions a coach or group leader could take.`;
 
     const prompt = `You are MindBuddy, an AI wellness analyst for coaches and therapists. Analyze this accountability group data:\n\n${ctx}\n${mode}\n\nUse markdown. Be specific — reference names, goals, and data points.`;
+    const contextForBackend = `${ctx}\nInstruction: ${mode}`;
 
     setAiLoading(true);
     setAiResult('');
     try {
       abortRef.current = new AbortController();
-      const reply = await askGemini(prompt, abortRef.current.signal);
+      const signal = abortRef.current.signal;
+      const reply = getBackendUrl()
+        ? await coachGroupAnalysisBackend(contextForBackend, signal)
+        : await askGemini(prompt, signal);
       setAiResult(reply);
     } catch (e: any) {
       if (e.name !== 'AbortError') setAiResult(`Error: ${e.message}`);

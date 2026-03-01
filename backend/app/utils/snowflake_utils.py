@@ -232,6 +232,48 @@ def detect_risk_patterns(user_id: str):
         conn.close()
 
 
+def get_goals_context_snowflake(user_id: str) -> str | None:
+    """
+    Get goals and check-ins context for a user from Snowflake (for AI coach).
+    Returns a formatted string or None if Snowflake unavailable / empty.
+    """
+    try:
+        conn = get_snowflake_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                SELECT goal_id, title, category, frequency, created_at
+                FROM dim_goals WHERE user_id = %s ORDER BY created_at DESC
+            """, (user_id,))
+            goals_rows = cursor.fetchall()
+            cursor.execute("""
+                SELECT goal_id, completed, timestamp
+                FROM fact_checkins WHERE user_id = %s ORDER BY timestamp DESC LIMIT 50
+            """, (user_id,))
+            checkins_rows = cursor.fetchall()
+        finally:
+            cursor.close()
+            conn.close()
+
+        lines = [f"User ID: {user_id}", ""]
+        if goals_rows:
+            lines.append("Goals (from Snowflake):")
+            for r in goals_rows:
+                gid, title, category, freq, created = r
+                lines.append(f"  - {title} (category: {category or 'n/a'}, frequency: {freq or 'n/a'})")
+            lines.append("")
+        if checkins_rows:
+            lines.append("Recent check-ins:")
+            for r in checkins_rows[:20]:
+                goal_id, completed, ts = r
+                lines.append(f"  - {ts}: completed={completed}")
+        if not goals_rows and not checkins_rows:
+            return None
+        return "\n".join(lines)
+    except Exception:
+        return None
+
+
 def get_mentor_patient_metrics(mentor_id: str):
     """Get aggregated metrics for all patients of a mentor."""
     conn = get_snowflake_connection()

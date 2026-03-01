@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { useApp } from '../context/AppContext';
 import { Card } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Textarea } from '../components/ui/textarea';
 import { Send, Sparkles, Loader2, Bot, User as UserIcon, Trash2 } from 'lucide-react';
-import { askGemini, isGeminiEnabled } from '../lib/gemini';
+import { askGemini, isGeminiEnabled, getBackendUrl, coachAskBackend } from '../lib/gemini';
 import { format } from 'date-fns';
 
 interface Message { role: 'user' | 'ai'; text: string }
@@ -79,9 +80,19 @@ export const Chat: React.FC = () => {
 
     try {
       abortRef.current = new AbortController();
-      const ctx = buildContext(user, goals, checkIns);
-      const prompt = `You are MindBuddy, a supportive mental health and wellness AI coach. You have access to this user's goal data:\n\n${ctx}\n\nUser message: ${userMsg}\n\nRespond helpfully. Use markdown formatting. Be warm but actionable. Reference their specific goals and progress when relevant.`;
-      const reply = await askGemini(prompt, abortRef.current.signal);
+      const signal = abortRef.current.signal;
+      const backendUrl = getBackendUrl();
+      let reply: string;
+      if (backendUrl && user?.id) {
+        reply = await coachAskBackend(user.id, userMsg, signal);
+      } else if (backendUrl && !user?.id) {
+        setMessages(prev => [...prev, { role: 'ai', text: 'Please sign in to use the AI coach.' }]);
+        return;
+      } else {
+        const ctx = buildContext(user, goals, checkIns);
+        const prompt = `You are MindBuddy, a supportive mental health and wellness AI coach. You have access to this user's goal data:\n\n${ctx}\n\nUser message: ${userMsg}\n\nRespond helpfully. Use markdown formatting. Be warm but actionable. Reference their specific goals and progress when relevant.`;
+        reply = await askGemini(prompt, signal);
+      }
       setMessages(prev => [...prev, { role: 'ai', text: reply }]);
     } catch (e: any) {
       if (e.name !== 'AbortError') {
@@ -108,7 +119,7 @@ export const Chat: React.FC = () => {
             <Sparkles className="w-8 h-8 text-[#C8B3E0]" />
           </div>
           <p className="text-[#4A4A4A] mb-2 font-medium">AI Coach not configured</p>
-          <p className="text-sm text-[#8A8A8A]">Add <code className="bg-[#F5F0FF] px-1.5 py-0.5 rounded text-xs">VITE_GEMINI_API_KEY</code> to your <code className="bg-[#F5F0FF] px-1.5 py-0.5 rounded text-xs">.env</code> file to enable.</p>
+          <p className="text-sm text-[#8A8A8A]">Set <code className="bg-[#F5F0FF] px-1.5 py-0.5 rounded text-xs">VITE_API_URL</code> to your backend (recommended) or <code className="bg-[#F5F0FF] px-1.5 py-0.5 rounded text-xs">VITE_GEMINI_API_KEY</code> in <code className="bg-[#F5F0FF] px-1.5 py-0.5 rounded text-xs">.env</code> to enable.</p>
         </Card>
       </div>
     );
@@ -161,12 +172,30 @@ export const Chat: React.FC = () => {
                 <Bot className="w-4 h-4 text-[#C8B3E0]" />
               </div>
             )}
-            <div className={`max-w-[80%] px-4 py-3 rounded-2xl text-sm whitespace-pre-wrap ${
+            <div className={`max-w-[85%] px-4 py-3 rounded-2xl text-sm ${
               msg.role === 'user'
                 ? 'bg-gradient-to-br from-[#C8B3E0] to-[#B39DD1] text-white'
                 : 'bg-white border border-[#F0F0F0] text-[#4A4A4A]'
             }`}>
-              {msg.text}
+              {msg.role === 'ai' ? (
+                <ReactMarkdown
+                  components={{
+                    p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                    ul: ({ children }) => <ul className="list-disc pl-4 my-2 space-y-0.5">{children}</ul>,
+                    ol: ({ children }) => <ol className="list-decimal pl-4 my-2 space-y-0.5">{children}</ol>,
+                    li: ({ children }) => <li className="leading-snug">{children}</li>,
+                    strong: ({ children }) => <strong className="font-semibold text-[#3A3A3A]">{children}</strong>,
+                    code: ({ children }) => <code className="bg-[#F5F0FF] px-1.5 py-0.5 rounded text-xs">{children}</code>,
+                    h1: ({ children }) => <h1 className="text-base font-semibold mt-3 mb-1">{children}</h1>,
+                    h2: ({ children }) => <h2 className="text-sm font-semibold mt-3 mb-1">{children}</h2>,
+                    h3: ({ children }) => <h3 className="text-sm font-semibold mt-2 mb-1">{children}</h3>,
+                  }}
+                >
+                  {msg.text}
+                </ReactMarkdown>
+              ) : (
+                <span className="whitespace-pre-wrap">{msg.text}</span>
+              )}
             </div>
             {msg.role === 'user' && (
               <div className="w-7 h-7 rounded-full bg-[#FFD4C8] flex items-center justify-center shrink-0 mt-1">
