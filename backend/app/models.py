@@ -126,7 +126,7 @@ class GroupFeedPost(Base):
     user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
     content = Column(Text, nullable=False)
     post_type = Column(String)  # human, ai_coach, milestone
-    metadata = Column(JSON, nullable=True)
+    post_metadata = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

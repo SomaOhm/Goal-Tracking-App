@@ -15,7 +15,12 @@ app = FastAPI(
 @app.on_event("startup")
 def startup():
     """Create database tables on application startup."""
-    Base.metadata.create_all(bind=engine)
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as e:
+        print(f"Warning: Could not create database tables: {e}")
+        print("API will run without database. Update DATABASE_URL in .env to connect to a real database.")
+
 
 
 # Add CORS middleware
